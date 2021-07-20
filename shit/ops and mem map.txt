@@ -1,0 +1,113 @@
+LOAD.A <val/addr>	load
+LOAD.B <val/addr>
+LOAD.M <val/addr>
+
+STORE <val>, <addr>	store val at addr
+STORE.A <addr>	store
+STORE.B <addr>
+STORE.M <addr>
+
+INT <addr>	fire interrupt ADDR
+IRETURN		return
+
+PUSH <val>
+PUSH.A
+PUSH.B
+PUSH.M
+PUSH.PC
+
+PULL.A
+PULL.B
+PULL.M
+PULL.PC
+
+INC <addr>
+INC.A
+INC.B
+INC.M
+
+DEC <addr>
+DEC.A
+DEC.B
+DEC.M
+
+ADD.A <val/addr>
+ADD.B <val/addr>
+ADD.M <val/addr>
+
+SUB.A <val/addr>
+SUB.B <val/addr>
+SUB.M <val/addr>
+
+LSH.A
+LSH.B
+RSH.A
+RSH.B
+
+AND.A <val/addr>
+AND.B <val/addr>
+
+OR.A <val/addr>
+OR.B <val/addr>
+
+XOR.A <val/addr>
+XOR.B <val/addr>
+
+NOT.A
+NOT.B
+
+
+IF.C <addr>
+IFN.C <addr>
+
+IFZ.A <addr>
+IFZ.B <addr>
+
+IFNZ.A <addr>
+IFNZ.B <addr>
+
+IFC.A <addr>
+
+COMP.A <val/addr/B>
+COMP.B <val/addr>
+COMP.M <val/addr>
+
+JUMP <addr>
+
+MOVE.A-B
+MOVE.B-A
+MOVE.M-AB
+MOVE.M-MA
+MOVE.M-MB
+MOVE.M-AM
+MOVE.M-BM
+
+
+
+0000	$$$$$$$$$$$$$$$		__MAP_STATICRAM_START
+	$ static RAM $$
+	$$$$$$$$$$$$$$$	1EFF	__MAP_STACK_START
+1F00	---- stack ----	1FFF	__MAP_STATICRAM_END
+	
+2000	###############		__MAP_BANK_START
+	###############
+	###############
+	###############
+	#### banks ####	Includes both RAM and ROM
+	###############
+	###############
+	###############
+	###############	9FFF	__MAP_BANK_END
+	
+A000	***************		__MAP_STATICROM_START
+	***************
+	* static ROM **
+	***************
+	***************	FEFF	__MAP_STATICROM_END
+	
+FF00	@ device regs @	FFFF	__MAP_DEVICEREGS_BEGIN
+				__MAP_DEVICEREGS_END
+
+
+Device registers
+
