@@ -109,12 +109,15 @@ CONST __BANK_RAMBANKS = 10
 CONST __BANK_ROMBANKS = 1
 CONST __ROM_TOTALSIZE = 1
 
+CONST UPDATEINTERVAL = 1 / 60
+
 
 DIM SHARED StaticRAM(__MAP_STATICRAM_BEGIN TO __MAP_STATICRAM_END) AS _UNSIGNED _BYTE
 DIM SHARED StaticROM(__MAP_STATICROM_BEGIN TO __MAP_STATICROM_END) AS _UNSIGNED _BYTE
 DIM SHARED BankedRAM(__MAP_BANK_BEGIN TO __MAP_BANK_END, __BANK_RAMBANKS) AS _UNSIGNED _BYTE
 DIM SHARED BankedROM(__MAP_BANK_BEGIN TO __MAP_BANK_END, __BANK_ROMBANKS) AS _UNSIGNED _BYTE
 DIM SHARED DeviceRAM(__MAP_DEVICEREGS_BEGIN TO __MAP_DEVICEREGS_END) AS _UNSIGNED _BYTE
+DIM SHARED GPUImage&
 
 DIM CPU AS CPURegisters
 
@@ -124,23 +127,19 @@ CPU.PC = __MAP_STATICROM_BEGIN
 SCREEN _NEWIMAGE(__GPU_MODE_HIRES_WIDTH, __GPU_MODE_HIRES_HEIGHT, 32)
 GPUImage& = _NEWIMAGE(__GPU_MODE_HIRES_WIDTH, __GPU_MODE_HIRES_HEIGHT, 32)
 
-FrameTimer~% = _FREETIMER
-ON TIMER(FrameTimer~%, 1 / 60) GOSUB UpdateScreen
-
+ON TIMER(UPDATEINTERVAL) UpdateScreen
+TIMER ON
 
 DO
     System_CPU
-    System_GPU
-    _PUTIMAGE , GPUImage&, 0
-    '_DEST 0: PRINT "hi"
 LOOP
 
-UpdateScreen:
-System_GPU
-_PUTIMAGE , GPUImage&, 0
-FrameTimer~% = _FREETIMER
-ON TIMER(FrameTimer~%, 1 / 60) GOSUB UpdateScreen
-RETURN
+
+SUB UpdateScreen
+    System_GPU
+    _PUTIMAGE , GPUImage&, 0
+    _DISPLAY
+END SUB
 
 
 
@@ -155,7 +154,7 @@ SUB System_CPU
     op1~%% = B AND &HF0
     op2~%% = B AND &H0F
     SELECT CASE op1~%%
-        CASE &H0: SELECT CASE op2~%% 'LOAD
+        CASE &H00: SELECT CASE op2~%% 'LOAD
                 CASE &H0 'LOAD.A <val>
                     GOSUB Addr_Imm
                     CPU.A = B
@@ -226,7 +225,8 @@ SUB System_CPU
 
 
 
-        CASE &H4: SELECT CASE op2~%% 'STORE
+
+        CASE &H40: SELECT CASE op2~%% 'STORE
                 CASE &H1 'STORE.A <addr>
                     GOSUB Addr_Imm_2B
                     Bus_Write I, CPU.A
@@ -242,7 +242,6 @@ SUB System_CPU
 
                 CASE &H6 'STORE.B M
                     Bus_Write CPU.M, CPU.B
-
 
 
                 CASE &H9 'STORE.M <addr>
@@ -288,7 +287,142 @@ SUB System_CPU
 
 
 
-        CASE &H1: SELECT CASE op2~%% 'ADD
+        CASE &H60: SELECT CASE op2~%% 'IFZ, OR, IF
+                CASE &H0 'IFZ.A <rel>
+                    GOSUB Addr_Imm
+                    IF CPU.A = 0 THEN CPU.PC = CPU.PC + B
+
+                CASE &H1 'IFZ.A <addr>
+                    GOSUB Addr_Imm_2B
+                    IF CPU.A = 0 THEN CPU.PC = I
+
+                CASE &H2 'OR.A <val>
+                    GOSUB Addr_Imm
+                    CPU.A = CPU.A OR B
+
+                CASE &H3 'OR.A <addr>
+                    GOSUB Addr_Abs
+                    CPU.A = CPU.A OR B
+
+
+                CASE &H4 'IFZ.B <rel>
+                    GOSUB Addr_Imm
+                    IF CPU.B = 0 THEN CPU.PC = CPU.PC + B
+
+                CASE &H5 'IFZ.B <addr>
+                    GOSUB Addr_Imm_2B
+                    IF CPU.B = 0 THEN CPU.PC = I
+
+                CASE &H6 'OR.B <val>
+                    GOSUB Addr_Imm
+                    CPU.B = CPU.B OR B
+
+                CASE &H7 'OR.B <addr>
+                    GOSUB Addr_Abs
+                    CPU.B = CPU.B OR B
+
+
+                CASE &H8 'IF.C <rel>
+                    GOSUB Addr_Imm
+                    IF CPU.C THEN CPU.PC = CPU.PC + B
+
+                CASE &H9 'IF.C <addr>
+                    GOSUB Addr_Imm_2B
+                    IF CPU.C THEN CPU.PC = I
+
+
+                CASE &HC 'IF.CAR <rel>
+                    GOSUB Addr_Imm
+                    IF CPU.Carry THEN CPU.PC = CPU.PC + B
+
+                CASE &HD 'IF.CAR <addr>
+                    GOSUB Addr_Imm_2B
+                    IF CPU.Carry THEN CPU.PC = I
+
+
+
+                    'invalid ops
+                CASE &HA 'OR.M <val>
+                    GOSUB Addr_Imm
+                    CPU.M = CPU.M OR B
+
+                CASE &HB 'OR.M <addr>
+                    GOSUB Addr_Abs
+                    CPU.M = CPU.M OR B
+
+            END SELECT
+
+
+
+        CASE &H70: SELECT CASE op2~%% 'IFNZ, IFN
+                CASE &H0 'IF.A <rel>
+                    GOSUB Addr_Imm
+                    IF CPU.A THEN CPU.PC = CPU.PC + B
+
+                CASE &H1 'IF.A <addr>
+                    GOSUB Addr_Imm_2B
+                    IF CPU.A THEN CPU.PC = I
+
+
+                CASE &H4 'IF.B <rel>
+                    GOSUB Addr_Imm
+                    IF CPU.B THEN CPU.PC = CPU.PC + B
+
+                CASE &H5 'IF.B <addr>
+                    GOSUB Addr_Imm_2B
+                    IF CPU.B THEN CPU.PC = I
+
+
+                CASE &H8 'IFN.C <rel>
+                    GOSUB Addr_Imm
+                    IF CPU.C = 0 THEN CPU.PC = CPU.PC + B
+
+                CASE &H9 'IFN.C <addr>
+                    GOSUB Addr_Imm_2B
+                    IF CPU.C = 0 THEN CPU.PC = I
+
+
+                CASE &HC 'IFN.CAR <rel>
+                    GOSUB Addr_Imm
+                    IF CPU.Carry = 0 THEN CPU.PC = CPU.PC + B
+
+                CASE &HD 'IFN.CAR <addr>
+                    GOSUB Addr_Imm_2B
+                    IF CPU.Carry = 0 THEN CPU.PC = I
+
+
+
+                    'invalid ops
+                CASE &H2 'NOR.A <val>
+                    GOSUB Addr_Imm
+                    CPU.A = ((NOT CPU.A) AND &H00FF) OR B
+
+                CASE &H3 'NOR.A <addr>
+                    GOSUB Addr_Abs
+                    CPU.A = ((NOT CPU.A) AND &H00FF) OR B
+
+
+                CASE &H6 'NOR.B <val>
+                    GOSUB Addr_Imm
+                    CPU.B = ((NOT CPU.B) AND &H00FF) OR B
+
+                CASE &H7 'NOR.B <addr>
+                    GOSUB Addr_Abs
+                    CPU.B = ((NOT CPU.B) AND &H00FF) OR B
+
+
+                CASE &HA 'NOR.M <val>
+                    GOSUB Addr_Imm
+                    CPU.M = ((NOT CPU.M) AND &H0000FFFF) OR B
+
+                CASE &HB 'NOR.M <addr>
+                    GOSUB Addr_Abs
+                    CPU.M = ((NOT CPU.M) AND &H0000FFFF) OR B
+            END SELECT
+
+
+
+        CASE &H10: SELECT CASE op2~%% 'ADD
                 CASE &H0 'ADD.A <val>
                     GOSUB Addr_Imm
                     CPU.A = CPU.A + B
@@ -346,7 +480,7 @@ SUB System_CPU
 
 
 
-        CASE &H2: SELECT CASE op2~%% 'SUB
+        CASE &H20: SELECT CASE op2~%% 'SUB
                 CASE &H0 'SUB.A <val>
                     GOSUB Addr_Imm
                     CPU.A = CPU.A - B
@@ -405,7 +539,7 @@ SUB System_CPU
 
 
 
-        CASE &H8: SELECT CASE op2~%% 'SH/ROT
+        CASE &H80: SELECT CASE op2~%% 'SH/ROT
                 CASE &H0 'LSH.A
                     CPU.A = _SHL(CPU.A, 1)
 
@@ -417,7 +551,9 @@ SUB System_CPU
                     CPU.A = _SHL(CPU.A, 1) OR CPU.Carry
 
                 CASE &H3 'RROT.A
+                    temp~%% = CPU.A AND &B1
                     CPU.A = _SHR(CPU.A, 1) OR _SHL(CPU.Carry, 7)
+                    CPU.Carry = temp~%%
 
 
 
@@ -432,7 +568,9 @@ SUB System_CPU
                     CPU.B = _SHL(CPU.B, 1) OR CPU.Carry
 
                 CASE &H7 'RROT.B
+                    temp~%% = CPU.B AND &B1
                     CPU.B = _SHR(CPU.B, 1) OR _SHL(CPU.Carry, 7)
+                    CPU.Carry = temp~%%
 
 
 
@@ -447,8 +585,9 @@ SUB System_CPU
                     CPU.M = _SHL(CPU.M, 1) OR CPU.Carry
 
                 CASE &HB 'RROT.M
+                    temp~%% = CPU.M AND &B1
                     CPU.M = _SHR(CPU.M, 1) OR _SHL(CPU.Carry, 15)
-
+                    CPU.Carry = temp~%%
 
 
                     'invalid ops
@@ -474,7 +613,7 @@ SUB System_CPU
 
 
 
-        CASE &H9: SELECT CASE op2~%% 'PUSH/PULL/INC/DEC
+        CASE &H90: SELECT CASE op2~%% 'PUSH/PULL/INC/DEC
                 CASE &H0 'PUSH.A
                     B = CPU.A
                     GOSUB Push
@@ -547,7 +686,7 @@ SUB System_CPU
 
 
 
-        CASE &HA: SELECT CASE op2~%% 'MOVE
+        CASE &HA0: SELECT CASE op2~%% 'MOVE
                 CASE &H1 'MOVE.A-B
                     CPU.B = CPU.A
                 CASE &H2 'MOVE.A-MA
@@ -577,7 +716,68 @@ SUB System_CPU
             END SELECT
 
 
-        CASE &HF: SELECT CASE op2~%% 'Others
+
+
+        CASE &H50: SELECT CASE op2~%% 'AND, XOR
+                CASE &H0 'AND.A <val>
+                    GOSUB Addr_Imm
+                    CPU.A = CPU.A AND B
+
+                CASE &H1 'AND.A <addr>
+                    GOSUB Addr_Abs
+                    CPU.A = CPU.A AND B
+
+
+                CASE &H2 'XOR.A <val>
+                    GOSUB Addr_Imm
+                    CPU.A = CPU.A XOR B
+
+                CASE &H3 'XOR.A <addr>
+                    GOSUB Addr_Abs
+                    CPU.A = CPU.A XOR B
+
+
+                CASE &H4 'AND.B <val>
+                    GOSUB Addr_Imm
+                    CPU.B = CPU.B AND B
+
+                CASE &H5 'AND.B <addr>
+                    GOSUB Addr_Abs
+                    CPU.B = CPU.B AND B
+
+
+                CASE &H6 'XOR.B <val>
+                    GOSUB Addr_Imm
+                    CPU.B = CPU.B XOR B
+
+                CASE &H7 'XOR.B <addr>
+                    GOSUB Addr_Abs
+                    CPU.B = CPU.B XOR B
+
+
+
+                    'invalid ops
+                CASE &H8 'AND.M <val>
+                    GOSUB Addr_Imm
+                    CPU.M = (CPU.M AND B) OR (CPU.M AND &HFF00)
+
+                CASE &H9 'AND.M <addr>
+                    GOSUB Addr_Abs
+                    CPU.M = (CPU.M AND B) OR (CPU.M AND &HFF00)
+
+                CASE &HA 'XOR.M <val>
+                    GOSUB Addr_Imm
+                    CPU.M = CPU.M XOR B
+
+                CASE &HB 'AND.M <addr>
+                    GOSUB Addr_Abs
+                    CPU.M = CPU.M XOR B
+
+            END SELECT
+
+
+
+        CASE &HF0: SELECT CASE op2~%% 'Others
                 CASE &H0 'INC <addr>
                     GOSUB Addr_Imm_2B
                     tmp~%% = Bus_Get(I)
@@ -619,6 +819,7 @@ CPU.Carry = (CPU.A > 255) OR _
     CPU.A = CPU.A AND &HFF
     CPU.B = CPU.B AND &HFF
     CPU.M = CPU.M AND &HFFFF
+    CPU.Carry = (CPU.Carry <> 1) AND &B1
 
     EXIT SUB
 
@@ -685,6 +886,7 @@ FUNCTION B2I~% (b1~%%, b2~%%)
 END FUNCTION
 
 SUB Bus_Write (a~%, b~%%)
+    '_ECHO HEX$(a~%) + " " + HEX$(b~%%)
     SHARED Bank AS BankRegisters
     SELECT CASE a~%
 
@@ -720,6 +922,10 @@ SUB Bus_DeviceActions (a~%)
         CASE __GSU_GREG_WRITE
             SHARED VRAM() AS _UNSIGNED _BYTE
             VRAM(B2I(DeviceRAM(__GSU_GREG_WRITE_ADDR), DeviceRAM(__GSU_GREG_WRITE_ADDR + 1))) = DeviceRAM(__GSU_GREG_WRITE_BYTE)
+
+            i~%% = DeviceRAM(__GSU_GREG_WRITE_ADDR) 'incrememnt it
+            DeviceRAM(__GSU_GREG_WRITE_ADDR + 1) = DeviceRAM(__GSU_GREG_WRITE_ADDR + 1) - (i~%% = 255)
+            DeviceRAM(__GSU_GREG_WRITE_ADDR) = i~%% + 1
             '$END IF
 
 
@@ -746,8 +952,6 @@ FUNCTION Bus_Get~%% (a~%)
             Bus_DeviceActions a~%
             Bus_Get = DeviceRAM(a~%)
     END SELECT
-    '_ECHO "$" + HEX$(a~%) + "= $" + HEX$(Bus_Get)
-    'SLEEP
 END FUNCTION
 
 
