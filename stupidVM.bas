@@ -69,7 +69,8 @@ $IF GSU = BITMAP THEN
     $LET GPU = BITMAP
     CONST __GSU_GREG_WRITE_BYTE = __MAP_DEVICE_GSU + &H0 '1 byte
     CONST __GSU_GREG_WRITE_ADDR = __MAP_DEVICE_GSU + &H1 '2 bytes
-    CONST __GSU_GREG_PAGEOFFSET = __MAP_DEVICE_GSU + &H2 '2 bytes
+    CONST __GSU_GREG_PAGEOFFSET = __MAP_DEVICE_GSU + &H2 '1 byte
+    CONST __GSU_GREG_VMODE = __MAP_DEVICE_GSU + &H3 '1 byte
     CONST __GSU_GREG_WRITE = __GSU_GREG_WRITE_BYTE
 
     CONST __GSU_SREG_CH1_WAVE = __MAP_DEVICE_GSU + &H4 '4 bytes
@@ -94,16 +95,6 @@ $IF GSU = BITMAP THEN
 
     DIM VRAM(__GPU_VRAMSIZE) AS _UNSIGNED _BYTE
 $END IF
-$IF GSU = SPRITE THEN
-    $LET SOUND = BEEP
-    $LET GPU = SPRITE
-    CONST __GSU_SREG_PITCH = __MAP_DEVICE_GSU + &H0 '2 bytes
-
-    CONST __GSU_GREG_WRITE_BYTE = __MAP_DEVICE_GSU + &H2 '1 byte
-    CONST __GSU_GREG_WRITE_ADDR = __MAP_DEVICE_GSU + &H3 '2 bytes
-
-    CONST __GSU_GREG_WRITE = __GSU_GREG_WRITE_BYTE
-$END IF
 
 CONST __BANK_RAMBANKS = 10
 CONST __BANK_ROMBANKS = 1
@@ -117,15 +108,25 @@ DIM SHARED StaticROM(__MAP_STATICROM_BEGIN TO __MAP_STATICROM_END) AS _UNSIGNED 
 DIM SHARED BankedRAM(__MAP_BANK_BEGIN TO __MAP_BANK_END, __BANK_RAMBANKS) AS _UNSIGNED _BYTE
 DIM SHARED BankedROM(__MAP_BANK_BEGIN TO __MAP_BANK_END, __BANK_ROMBANKS) AS _UNSIGNED _BYTE
 DIM SHARED DeviceRAM(__MAP_DEVICEREGS_BEGIN TO __MAP_DEVICEREGS_END) AS _UNSIGNED _BYTE
-DIM SHARED GPUImage&
+DIM SHARED GPUImage&, TextModeFont&
+DIM Pallete_Color(15) AS _UNSIGNED LONG
+DIM Pallete_HiColor(255) AS _UNSIGNED LONG
 
-DIM CPU AS CPURegisters
+DIM SHARED CPU AS CPURegisters, GPU AS GPURegisters
 
 LoadROM "test.rom"
 CPU.PC = __MAP_STATICROM_BEGIN
 
-SCREEN _NEWIMAGE(__GPU_MODE_HIRES_WIDTH, __GPU_MODE_HIRES_HEIGHT, 32)
-GPUImage& = _NEWIMAGE(__GPU_MODE_HIRES_WIDTH, __GPU_MODE_HIRES_HEIGHT, 32)
+_ECHO "Generating palletes..."
+System_GPU_GeneratePalletes
+_ECHO "done"
+
+TextModeFont& = 16
+SCREEN _NEWIMAGE(640, 480, 32)
+GPUImage& = _NEWIMAGE(8, 8, 32)
+Bus_DeviceActions __GSU_GREG_VMODE
+
+
 
 ON TIMER(UPDATEINTERVAL) UpdateScreen
 TIMER ON
@@ -911,6 +912,9 @@ SUB Bus_Write (a~%, b~%%)
     END SELECT
 END SUB
 
+
+
+
 SUB Bus_DeviceActions (a~%)
     SELECT CASE a~% 'devices sometimes do stuff when read/written to
         CASE __SYS_BANKNO
@@ -926,11 +930,40 @@ SUB Bus_DeviceActions (a~%)
             i~%% = DeviceRAM(__GSU_GREG_WRITE_ADDR) 'incrememnt it
             DeviceRAM(__GSU_GREG_WRITE_ADDR + 1) = DeviceRAM(__GSU_GREG_WRITE_ADDR + 1) - (i~%% = 255)
             DeviceRAM(__GSU_GREG_WRITE_ADDR) = i~%% + 1
+
+        CASE __GSU_GREG_VMODE
+            SHARED GPUImage&, GPU AS GPURegisters, TextModeFont&
+            tmp~%% = DeviceRAM(__GSU_GREG_VMODE)
+            IF tmp~%% = GPU.VMode THEN EXIT SUB
+            SELECT CASE tmp~%%
+
+                CASE __GPU_MODE_TEXT
+                    _FREEIMAGE GPUImage&
+                    GPUImage& = _NEWIMAGE(__GPU_MODE_TEXT_COLS * _FONTWIDTH(TextModeFont&), __GPU_MODE_TEXT_ROWS * _FONTHEIGHT(TextModeFont&), 32)
+                    _FONT TextModeFont&, GPUImage&
+
+                CASE __GPU_MODE_HIRES
+                    _FREEIMAGE GPUImage&
+                    GPUImage& = _NEWIMAGE(__GPU_MODE_HIRES_WIDTH, __GPU_MODE_HIRES_HEIGHT, 32)
+
+                CASE __GPU_MODE_COLOR
+                    _FREEIMAGE GPUImage&
+                    GPUImage& = _NEWIMAGE(__GPU_MODE_COLOR_WIDTH, __GPU_MODE_COLOR_HEIGHT, 32)
+
+                CASE __GPU_MODE_HICOLOR
+                    _FREEIMAGE GPUImage&
+                    GPUImage& = _NEWIMAGE(__GPU_MODE_HICOLOR_WIDTH, __GPU_MODE_HICOLOR_HEIGHT, 32)
+
+                CASE ELSE: _ECHO "ERROR: Invalid video mode!": EXIT SUB
+            END SELECT
+            GPU.VMode = tmp~%%
+            _ECHO "Video mode set to " + STR$(tmp~%%)
             '$END IF
-
-
     END SELECT
 END SUB
+
+
+
 
 FUNCTION Bus_Get~%% (a~%)
     SHARED Bank AS BankRegisters
@@ -1006,18 +1039,14 @@ $IF SOUND = WAVE THEN
         'todo
     END SUB
 $END IF
-$IF SOUND = BEEP THEN
-    SUB System_Sound
-    END SUB
-$END IF
 
 $IF GPU = BITMAP THEN
     SUB System_GPU
-        SHARED GPUImage&, GPU AS GPURegisters
+        SHARED GPUImage&, TextModeFont&, GPU AS GPURegisters
         SHARED VRAM() AS _UNSIGNED _BYTE
 
-        STATIC Pallete_Color(15) AS _UNSIGNED LONG
-        STATIC Pallete_HiColor(255) AS _UNSIGNED LONG
+        SHARED Pallete_Color() AS _UNSIGNED LONG
+        SHARED Pallete_HiColor() AS _UNSIGNED LONG
 
         STATIC w AS _UNSIGNED INTEGER, h AS _UNSIGNED INTEGER
         STATIC fw AS _UNSIGNED _BYTE, fh AS _UNSIGNED _BYTE
@@ -1025,8 +1054,13 @@ $IF GPU = BITMAP THEN
         'emulate
         _DEST GPUImage&
         CLS
-        SELECT CASE __GPU_MODE_HIRES 'GPU.VMode 'draw the screen
+        SELECT CASE GPU.VMode 'draw the screen
             CASE __GPU_MODE_TEXT
+                w = _WIDTH
+                h = _HEIGHT
+                fw = _FONTWIDTH
+                fh = _FONTHEIGHT
+
                 y~% = 0: DO 'according to ChiaPet#1361 (ID 404676474126336011 for archival purposes) on QB64 Discord, using this instead of FOR is faster
                     x~% = 0: DO
                         _PRINTSTRING (x~%, y~%), CHR$(VRAM(i~%))
@@ -1074,15 +1108,37 @@ $IF GPU = BITMAP THEN
                     x~% = 0: DO
                         PSET (x~%, y~%), Pallete_HiColor(VRAM(i~%))
                         i~% = i~% + 1
-                    x~% = x~% + 2: LOOP UNTIL x~% = __GPU_MODE_HICOLOR_WIDTH
+                    x~% = x~% + 1: LOOP UNTIL x~% = __GPU_MODE_HICOLOR_WIDTH
                 y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_HICOLOR_HEIGHT
 
         END SELECT
-
     END SUB
-$END IF
-$IF GPU = SPRITE THEN
-    SUB System_GPU
+
+    SUB System_GPU_GeneratePalletes
+        SHARED Pallete_Color() AS _UNSIGNED LONG
+        SHARED Pallete_HiColor() AS _UNSIGNED LONG
+
+        'Color pallete
+        FOR i~%% = 0 TO 15
+            IF i~%% AND &B0001 THEN R~%% = 255
+            IF i~%% AND &B0010 THEN G~%% = 255
+            IF i~%% AND &B0100 THEN B~%% = 255
+            IF (i~%% AND &B1000) = 0 THEN
+                R~%% = R~%% / 2
+                G~%% = G~%% / 2
+                B~%% = B~%% / 2
+            END IF
+            Pallete_Color(i~%%) = _RGB32(R~%%, G~%%, B~%%)
+        NEXT
+
+        'HiColor pallete
+        FOR i~%% = 0 TO 255
+            A~%% = _SHR(i~%% AND &B11000000, 2)
+            R~%% = _SHL(i~%% AND &B00000011, 6) OR A~%%
+            G~%% = _SHL(i~%% AND &B00001100, 4) OR A~%%
+            B~%% = _SHL(i~%% AND &B00110000, 2) OR A~%%
+            Pallete_HiColor(i~%%) = _RGB32(R~%%, G~%%, B~%%)
+        NEXT
     END SUB
 $END IF
 
