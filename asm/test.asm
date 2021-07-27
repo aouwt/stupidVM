@@ -1,17 +1,21 @@
-#include "./stupidVM.asm"
+	#include "./stupidVM.asm"
 
 #bank srom
 
-	load.a #VMODE_HIRES
+	load.a #VMODE_TEXT
 	store.a GPU_VMODE
-	load.a #0
-	load.b #1
+.start:
+	load.m #.text
 	
-.loop:
+.print:
+	load.b M
 	store.b GPU_WRITEBYTE
-	lsh.b
-	ifnz.b .loop
+	inc.m
+	ifz.b .end
+	jump .print
 
-	inc.a
-	move.a-b
-	jump .loop
+.text:
+	#d "Hello, world!",0x00
+
+.end:
+	jump .end

@@ -4,20 +4,20 @@
 	nop		=>	0x00	;it wont assemble without this?
 	
 	load.a #{value}	=>	0x00 @ value[7:0]
-	load.a {addr}	=>	0x01 @ addr[15:7] @ addr[7:0]
+	load.a {addr}	=>	0x01 @ addr[7:0] @ addr[15:8]
 	load.a m	=>	0x02
 	
 	load.b #{value}	=>	0x04 @ value[7:0]
-	load.b {addr}	=>	0x05 @ addr[15:7] @ addr[7:0]
+	load.b {addr}	=>	0x05 @ addr[7:0] @ addr[15:8]
 	load.b m	=>	0x06
 	
-	load.m #{value}	=>	0x08 @ value[15:0]
-	load.m {addr}	=>	0x09 @ addr[15:7] @ addr[7:0]
+	load.m #{value}	=>	0x08 @ value[7:0] @ value[15:8]
+	load.m {addr}	=>	0x09 @ addr[7:0] @ addr[15:8]
 	
 	
-	jump {addr}	=>	{	assert((addr-pc) <= 0xFF)
-					assert((addr-pc) >= 0x00)
-					0x0C @ (addr-pc)[7:0]		}
+	jump {addr}	=>	{	assert((addr-pc-2) <= 0xFF)
+					assert((addr-pc-2) >= 0x00)
+					0x0C @ (addr-pc-2)[7:0]		}
 	jump {addr}	=>	0x0D @ addr[7:0] @ addr[15:8]
 	jump m 		=>	0x0E
 	
@@ -87,54 +87,54 @@
 	xor.b {addr}	=>	0x57 @ addr[7:0] @ addr[15:8]
 	
 	
-	ifz.a {addr}	=>	{	assert((addr-pc) <= 0xFF)
-					assert((addr-pc) >= 0x00)
-					0x60 @ (addr-pc)[7:0]		}
+	ifz.a {addr}	=>	{	assert((addr-pc-2) <= 0xFF)
+					assert((addr-pc-2) >= 0x00)
+					0x60 @ (addr-pc-2)[7:0]		}
 	ifz.a {addr}	=>	0x61 @ addr[7:0] @ addr[15:8]
 	
 	or.a #{value}	=>	0x62 @ value[7:0]
-	or.a {addr}		=>	0x63 @ addr[7:0] @ addr[15:8]
+	or.a {addr}	=>	0x63 @ addr[7:0] @ addr[15:8]
 	
 	
-	ifz.b {addr}	=>	{	assert((addr-pc) <= 0xFF)
-					assert((addr-pc) >= 0x00)
-					0x64 @ (addr-pc)[7:0]		}
+	ifz.b {addr}	=>	{	assert((addr-pc-2) <= 0xFF)
+					assert((addr-pc-2) >= 0x00)
+					0x64 @ (addr-pc-2)[7:0]		}
 	ifz.b {addr}	=>	0x65 @ addr[7:0] @ addr[15:8]
 	
 	or.b #{value}	=>	0x66 @ value[7:0]
 	or.b {addr}	=>	0x67 @ addr[7:0] @ addr[15:8]
 	
 	
-	if.c {addr}	=>	{	assert((addr-pc) <= 0xFF)
-					assert((addr-pc) >= 0x00)
-					0x68 @ (addr-pc)[7:0]		}
+	if.c {addr}	=>	{	assert((addr-pc-2) <= 0xFF)
+					assert((addr-pc-2) >= 0x00)
+					0x68 @ (addr-pc-2)[7:0]		}
 	if.c {addr}	=>	0x69 @ addr[7:0] @ addr[15:8]		;noice
 	
-	if.car {addr}	=>	{	assert((addr-pc) <= 0xFF)
-					assert((addr-pc) >= 0x00)
-					0x6C @ (addr-pc)[7:0]		}
+	if.car {addr}	=>	{	assert((addr-pc-2) <= 0xFF)
+					assert((addr-pc-2) >= 0x00)
+					0x6C @ (addr-pc-2)[7:0]		}
 	if.car {addr}	=>	0x6D @ addr[7:0] @ addr[15:8]
 	
 	
-	ifnz.a {addr}	=>	{	assert((addr-pc) <= 0xFF)
-					assert((addr-pc) >= 0x00)
-					0x70 @ (addr-pc)[7:0]		}
+	ifnz.a {addr}	=>	{	assert((addr-pc-2) <= 0xFF)
+					assert((addr-pc-2) >= 0x00)
+					0x70 @ (addr-pc-2)[7:0]		}
 	ifnz.a {addr}	=>	0x71 @ addr[7:0] @ addr[15:8]
 	
-	ifnz.b {addr}	=>	{	assert((addr-pc) <= 0xFF)
-					assert((addr-pc) >= 0x00)
-					0x74 @ (addr-pc)[7:0]		}
+	ifnz.b {addr}	=>	{	assert((addr-pc-2) <= 0xFF)
+					assert((addr-pc-2) >= 0x00)
+					0x74 @ (addr-pc-2)[7:0]		}
 	ifnz.b {addr}	=>	0x75 @ addr[7:0] @ addr[15:8]
 	
 	
-	ifn.c {addr}	=>	{	assert((addr-pc) <= 0xFF)
-					assert((addr-pc) >= 0x00)
-					0x78 @ (addr-pc)[7:0]		}
+	ifn.c {addr}	=>	{	assert((addr-pc-2) <= 0xFF)
+					assert((addr-pc-2) >= 0x00)
+					0x78 @ (addr-pc-2)[7:0]		}
 	ifn.c {addr}	=>	0x79 @ addr[7:0] @ addr[15:8]
 	
-	ifn.car {addr}	=>	{	assert((addr-pc) <= 0xFF)
-					assert((addr-pc) >= 0x00)
-					0x7C @ (addr-pc)[7:0]		}
+	ifn.car {addr}	=>	{	assert((addr-pc-2) <= 0xFF)
+					assert((addr-pc-2) >= 0x00)
+					0x7C @ (addr-pc-2)[7:0]		}
 	ifn.car {addr}	=>	0x7D @ addr[7:0] @ addr[15:8]
 	
 	

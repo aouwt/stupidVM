@@ -18,7 +18,7 @@ END TYPE
 TYPE GPURegisters
     VMode AS _UNSIGNED _BYTE
     Halt AS _UNSIGNED _BYTE
-    Page AS _UNSIGNED _BYTE
+    PageOffset AS _UNSIGNED INTEGER
 END TYPE
 
 TYPE BankRegisters
@@ -93,7 +93,7 @@ $IF GSU = BITMAP THEN
 
     CONST __GPU_VRAMSIZE = &HFFFF&
 
-    DIM VRAM(__GPU_VRAMSIZE) AS _UNSIGNED _BYTE
+    DIM SHARED VRAM(__GPU_VRAMSIZE) AS _UNSIGNED _BYTE
 $END IF
 
 CONST __BANK_RAMBANKS = 10
@@ -116,12 +116,13 @@ DIM SHARED CPU AS CPURegisters, GPU AS GPURegisters
 
 LoadROM "test.rom"
 CPU.PC = __MAP_STATICROM_BEGIN
+GPU.VMode = 100
 
 _ECHO "Generating palletes..."
 System_GPU_GeneratePalletes
 _ECHO "done"
 
-TextModeFont& = 16
+TextModeFont& = 8
 GPUImage& = _NEWIMAGE(8, 8, 32)
 Bus_DeviceActions __GSU_GREG_VMODE
 
@@ -243,6 +244,7 @@ SUB System_CPU
 
                 CASE &H6 'STORE.B M
                     Bus_Write CPU.M, CPU.B
+
 
 
                 CASE &H9 'STORE.M <addr>
@@ -804,7 +806,7 @@ SUB System_CPU
                     GOSUB Interrupt
 
                 CASE &HF 'BREAK
-                    END
+                    _ECHO "BREAK at " + HEX$(CPU.PC)
 
                     'invalid ops
                 CASE ELSE: GOTO InvalidOp
@@ -848,7 +850,7 @@ CPU.Carry = (CPU.A > 255) OR _
     RETURN
 
     Addr_M:
-    B = Bus(CPU.M)
+    B = Bus_Get(CPU.M)
     RETURN
 
     Addr_M_2B:
@@ -856,23 +858,23 @@ CPU.Carry = (CPU.A > 255) OR _
     RETURN
 
     Push:
-    Bus_Write __MEM_STACK_begin + CPU.StackPtr, B
+    Bus_Write __MEM_STACK_BEGIN + CPU.StackPtr, B
     CPU.StackPtr = CPU.StackPtr + 1
     RETURN
 
     Push_2B:
-    Bus_Write __MEM_STACK_begin + CPU.StackPtr, _SHR(I AND &HFF00, 8)
-    Bus_Write __MEM_STACK_begin + CPU.StackPtr + 1, I AND &H00FF
+    Bus_Write __MEM_STACK_BEGIN + CPU.StackPtr, _SHR(I AND &HFF00, 8)
+    Bus_Write __MEM_STACK_BEGIN + CPU.StackPtr + 1, I AND &H00FF
     CPU.StackPtr = CPU.StackPtr + 2
     RETURN
 
     Pull:
-    B = Bus_Get(__MEM_STACK_begin + CPU.StackPtr)
+    B = Bus_Get(__MEM_STACK_BEGIN + CPU.StackPtr)
     CPU.StackPtr = CPU.StackPtr - 1
     RETURN
 
     Pull_2B:
-    I = B2I(Bus_Get(__MEM_STACK_begin + CPU.StackPtr), Bus_Get(__MEM_STACK_begin + CPU.StackPtr + 1))
+    I = B2I(Bus_Get(__MEM_STACK_BEGIN + CPU.StackPtr), Bus_Get(__MEM_STACK_BEGIN + CPU.StackPtr + 1))
     CPU.StackPtr = CPU.StackPtr - 2
     RETURN
 
@@ -888,6 +890,7 @@ END FUNCTION
 
 SUB Bus_Write (a~%, b~%%)
     '_ECHO HEX$(a~%) + " " + HEX$(b~%%)
+    'SLEEP
     SHARED Bank AS BankRegisters
     SELECT CASE a~%
 
@@ -941,6 +944,7 @@ SUB Bus_DeviceActions (a~%)
                     _FREEIMAGE GPUImage&
                     GPUImage& = _NEWIMAGE(__GPU_MODE_TEXT_COLS * _FONTWIDTH(TextModeFont&), __GPU_MODE_TEXT_ROWS * _FONTHEIGHT(TextModeFont&), 32)
                     _FONT TextModeFont&, GPUImage&
+                    _ECHO "Font " + STR$(TextModeFont&) + " (w=" + STR$(_FONTWIDTH(TextModeFont&)) + "; h=" + STR$(_FONTHEIGHT(TextModeFont&)) + ")"
 
                 CASE __GPU_MODE_HIRES
                     _FREEIMAGE GPUImage&
@@ -959,6 +963,10 @@ SUB Bus_DeviceActions (a~%)
             GPU.VMode = tmp~%%
             _ECHO "Video mode set to " + STR$(tmp~%%)
             '$END IF
+
+        CASE __GSU_GREG_PAGEOFFSET
+            SHARED GPU AS GPURegisters
+            GPU.PageOffset = _SHL(DeviceRAM(__GSU_GREG_PAGEOFFSET), 8)
     END SELECT
 END SUB
 
@@ -966,6 +974,9 @@ END SUB
 
 
 FUNCTION Bus_Get~%% (a~%)
+    '_ECHO HEX$(a~%)
+    'DO: LOOP UNTIL LEN(INKEY$)
+
     SHARED Bank AS BankRegisters
     SELECT CASE a~%
         CASE IS <= __MAP_STATICRAM_END
@@ -1051,6 +1062,8 @@ $IF GPU = BITMAP THEN
         STATIC w AS _UNSIGNED INTEGER, h AS _UNSIGNED INTEGER
         STATIC fw AS _UNSIGNED _BYTE, fh AS _UNSIGNED _BYTE
 
+        i~% = GPU.PageOffset
+
         'emulate
         _DEST GPUImage&
         CLS
@@ -1060,7 +1073,6 @@ $IF GPU = BITMAP THEN
                 h = _HEIGHT
                 fw = _FONTWIDTH
                 fh = _FONTHEIGHT
-
                 y~% = 0: DO 'according to ChiaPet#1361 (ID 404676474126336011 for archival purposes) on QB64 Discord, using this instead of FOR is faster
                     x~% = 0: DO
                         _PRINTSTRING (x~%, y~%), CHR$(VRAM(i~%))
