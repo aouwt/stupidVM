@@ -122,7 +122,6 @@ System_GPU_GeneratePalletes
 _ECHO "done"
 
 TextModeFont& = 16
-SCREEN _NEWIMAGE(640, 480, 32)
 GPUImage& = _NEWIMAGE(8, 8, 32)
 Bus_DeviceActions __GSU_GREG_VMODE
 
@@ -138,7 +137,8 @@ LOOP
 
 SUB UpdateScreen
     System_GPU
-    _PUTIMAGE , GPUImage&, 0
+    SCREEN GPUImage&
+    '_PUTIMAGE , GPUImage&, 0
     _DISPLAY
 END SUB
 
