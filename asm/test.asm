@@ -2,14 +2,14 @@
 
 #bank srom
 
-	load.a #VMODE_HICOLOR
+	load.a #VMODE_HIRES
 	store.a GPU_VMODE
 	load.a #0
-	load.b #0
+	load.b #1
 	
 .loop:
 	store.b GPU_WRITEBYTE
-	inc.b
+	lsh.b
 	ifnz.b .loop
 
 	inc.a
