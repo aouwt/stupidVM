@@ -1,7 +1,7 @@
 #cpudef {
 	#bits 8
 	
-	nop		=>	0x00	;it wont assemble without this?
+	dontuseme	=>	0x00	;it wont assemble without this?
 	
 	load.a #{value}	=>	0x00 @ value[7:0]
 	load.a {addr}	=>	0x01 @ addr[7:0] @ addr[15:8]
@@ -34,6 +34,15 @@
 	
 	add.m #{value}	=>	0x18 @ value[7:0]
 	add.m {addr}	=>	0x19 @ addr[7:0] @ addr[15:8]
+	
+	
+	;subr {addr}	=>	{	assert((addr-pc-2) <= 0xFF)
+	;				assert((addr-pc-2) >= 0x00)
+	;				0x1C @ (addr-pc-2)[7:0]		}
+	subr {addr}	=>	0x1D @ addr[7:0] @ addr[15:8]
+	;subr m 	=>	0x1E
+	
+	
 	
 	
 	sub.a #{value}	=>	0x20 @ value[7:0]
@@ -185,7 +194,7 @@
 	
 	push.pc	=>	0x9C
 	pull.pc	=>	0x9D
-	
+	return	=>	0x9D	; alias
 	
 	
 	move.a-b	=>	0xA1

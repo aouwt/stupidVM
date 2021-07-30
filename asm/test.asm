@@ -2,20 +2,47 @@
 
 #bank srom
 
-	load.a #VMODE_TEXT
-	store.a GPU_VMODE
-.start:
-	load.m #.text
+	load.a	#VMODE_TEXT
+	store.a	GPU_VMODE
 	
-.print:
-	load.b M
-	store.b GPU_WRITEBYTE
+	
+	load.m	#Text_1
+	subr	PRINT
+	subr	NEWLINE
 	inc.m
-	ifz.b .end
-	jump .print
+	subr	PRINT
+	subr	NEWLINE
+	
+	jump	pc	;speen :D
+	
+PRINT:
+	load.a	M
+	ifz.a	.ret		;if byte=0 then return
+	store.a	GPU_WRITEBYTE
+	inc.m			;set to read next byte
+	jump	PRINT
+.ret:
+	return
 
-.text:
-	#d "Hello, world!",0x00
+NEWLINE:
+	load.a	GPU_WRITEADDR
+	and.a	#0b11000000	; nearest multiple of 64
+	store.a	GPU_WRITEADDR
+	
+	comp.a	#0b11000000	; if addr > 192...
+	if.c	.incnext	; ...then inc next
+	return
 
-.end:
-	jump .end
+.incnext:
+	load.a	GPU_WRITEADDR + 1
+	inc.a
+	store.a	GPU_WRITEADDR + 1
+	return
+
+
+
+
+Text_1:
+	#d	"Hello world!\0"
+Text_2:
+	#d	"This is using two lines!\0"

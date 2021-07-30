@@ -61,7 +61,9 @@ CONST __MAP_DEVICE_SYS = __MAP_DEVICEREGS_BEGIN + &H00
 CONST __MAP_DEVICE_GSU = __MAP_DEVICEREGS_BEGIN + &H10
 
 
-CONST __SYS_BANKNO = __MAP_DEVICE_SYS + &H00
+CONST __SYS_BANKNO = __MAP_DEVICE_SYS + &H0
+CONST __SYS_IO_MOUSE = __MAP_DEVICE_SYS + &H1
+CONST __SYS_IO_KEYBOARD = __MAP_DEVICE_SYS + &H2
 
 
 $IF GSU = BITMAP THEN
@@ -86,7 +88,7 @@ $IF GSU = BITMAP THEN
     CONST __GPU_MODE_COLOR = 2
     CONST __GPU_MODE_HICOLOR = 3
 
-    CONST __GPU_MODE_TEXT_COLS = 80, __GPU_MODE_TEXT_ROWS = 40
+    CONST __GPU_MODE_TEXT_COLS = 64, __GPU_MODE_TEXT_ROWS = 32
     CONST __GPU_MODE_HIRES_WIDTH = 512, __GPU_MODE_HIRES_HEIGHT = 512
     CONST __GPU_MODE_COLOR_WIDTH = 256, __GPU_MODE_COLOR_HEIGHT = 256
     CONST __GPU_MODE_HICOLOR_WIDTH = 128, __GPU_MODE_HICOLOR_HEIGHT = 128
@@ -192,8 +194,6 @@ SUB System_CPU
                     CPU.M = I
 
 
-
-
                 CASE &HC 'JUMP <rel>
                     GOSUB Addr_Imm
                     CPU.PC = CPU.PC + B
@@ -204,6 +204,10 @@ SUB System_CPU
 
                 CASE &HE 'JUMP M
                     CPU.PC = CPU.M
+
+
+
+
 
 
                     'invalid ops
@@ -237,7 +241,6 @@ SUB System_CPU
                     Bus_Write CPU.M, CPU.A
 
 
-
                 CASE &H5 'STORE.B <addr>
                     GOSUB Addr_Imm_2B
                     Bus_Write I, CPU.B
@@ -246,12 +249,10 @@ SUB System_CPU
                     Bus_Write CPU.M, CPU.B
 
 
-
                 CASE &H9 'STORE.M <addr>
                     GOSUB Addr_Imm_2B
                     Bus_Write I, CPU.M AND &H00FF
                     Bus_Write I + 1, _SHR(CPU.M AND &HFF00, 8)
-
 
 
                     'invalid ops
@@ -283,8 +284,6 @@ SUB System_CPU
                     Bus_Write CPU.M AND &HFF00, CPU.M
                     CPU.M = CPU.M + 1
                     Bus_Write CPU.M AND &HFF00, _SHR(CPU.M AND &HFF00, 8)
-
-
                 CASE ELSE: GOTO InvalidOp
             END SELECT
 
@@ -469,12 +468,33 @@ SUB System_CPU
                     CPU.M = CPU.M + B
 
 
+
+                CASE &HD 'SUBR <addr>
+                    I = CPU.PC + 2
+                    GOSUB Push_2B
+                    GOSUB Addr_Imm_2B
+                    CPU.PC = I
+
+
+
                     'invalid ops
                 CASE &HA 'ADD.M M
                     CPU.M = (CPU.M + CPU.M) AND (RND * &HFFFF)
 
                 CASE &HB 'ADD.M A, ADD.M B
                     CPU.M = CPU.M + (_SHR(CPU.M AND &HFF00, 8) AND (RND * &HFFFF))
+
+
+                CASE &HC 'SUBR <rel>
+                    I = CPU.PC + 2
+                    GOSUB Push_2B
+                    GOSUB Addr_Imm
+                    CPU.PC = CPU.PC + B
+
+                CASE &HF 'SUBR M
+                    I = CPU.PC + 2
+                    GOSUB Push_2B
+                    CPU.PC = CPU.PC + CPU.M
 
                 CASE ELSE: GOTO InvalidOp
             END SELECT
@@ -619,7 +639,7 @@ SUB System_CPU
         CASE &H90: SELECT CASE op2~%% 'PUSH/PULL/INC/DEC
                 CASE &H0 'PUSH.A
                     B = CPU.A
-                    GOSUB Push
+                    GOSUB push
 
                 CASE &H1 'PULL.A
                     GOSUB Pull
@@ -636,7 +656,7 @@ SUB System_CPU
 
                 CASE &H4 'PUSH.B
                     B = CPU.B
-                    GOSUB Push
+                    GOSUB push
 
                 CASE &H5 'PULL.B
                     GOSUB Pull
@@ -668,8 +688,8 @@ SUB System_CPU
 
 
 
-                CASE &HC 'PUSH.PC  (+2)
-                    I = CPU.PC + 2
+                CASE &HC 'PUSH.PC
+                    I = CPU.PC
                     GOSUB Push_2B
 
                 CASE &HD 'PULL.PC
@@ -857,7 +877,7 @@ CPU.Carry = (CPU.A > 255) OR _
     I = B2I(Bus_Get(CPU.M), Bus_Get(CPU.M + 1))
     RETURN
 
-    Push:
+    push:
     Bus_Write __MEM_STACK_BEGIN + CPU.StackPtr, B
     CPU.StackPtr = CPU.StackPtr + 1
     RETURN
@@ -925,7 +945,29 @@ SUB Bus_DeviceActions (a~%)
             Bank.Bank = DeviceRAM(__SYS_BANKNO)
             Bank.IsInRAM = (Bank.Bank AND &H10000000)
 
-            '$IF GSU = BITMAP THEN
+
+        CASE __SYS_IO_MOUSE
+            STATIC mousedata~%%
+            'ok so this is a little confusing
+            IF _MOUSEINPUT THEN
+                tmp%% = SGN(_MOUSEMOVEMENTX):                      mousedata~%% = (tmp%% = -1          )    _
+                                                                          AND _SHL(tmp%% = 1           , 1)
+                tmp%% = SGN(_MOUSEMOVEMENTY): mousedata~%% = mousedata~%% AND _SHL(tmp%% = -1          , 2) _
+                                                                          AND _SHL(tmp%% = 1           , 3) _
+                                                                          AND _SHL(_MOUSEWHEEL = -1    , 4) _
+                                                                          AND _SHL(_MOUSEWHEEL = 1     , 5) _
+                                                                          AND _SHL(_MOUSEBUTTON(1) = -1, 6) _
+                                                                          AND _SHL(_MOUSEBUTTON(2) = -1, 7)
+            END IF
+            DeviceRAM(__SYS_IO_MOUSE) = mousedata~%%
+
+
+        CASE __SYS_IO_KEYBOARD
+            tmp~& = _KEYHIT
+            IF tmp~& < 256 THEN DeviceRAM(__SYS_IO_KEYBOARD) = tmp~& ELSE DeviceRAM(__SYS_IO_KEYBOARD) = 0
+
+
+
         CASE __GSU_GREG_WRITE
             SHARED VRAM() AS _UNSIGNED _BYTE
             VRAM(B2I(DeviceRAM(__GSU_GREG_WRITE_ADDR), DeviceRAM(__GSU_GREG_WRITE_ADDR + 1))) = DeviceRAM(__GSU_GREG_WRITE_BYTE)
@@ -933,6 +975,8 @@ SUB Bus_DeviceActions (a~%)
             i~%% = DeviceRAM(__GSU_GREG_WRITE_ADDR) 'incrememnt it
             DeviceRAM(__GSU_GREG_WRITE_ADDR + 1) = DeviceRAM(__GSU_GREG_WRITE_ADDR + 1) - (i~%% = 255)
             DeviceRAM(__GSU_GREG_WRITE_ADDR) = i~%% + 1
+
+
 
         CASE __GSU_GREG_VMODE
             SHARED GPUImage&, GPU AS GPURegisters, TextModeFont&
@@ -944,7 +988,6 @@ SUB Bus_DeviceActions (a~%)
                     _FREEIMAGE GPUImage&
                     GPUImage& = _NEWIMAGE(__GPU_MODE_TEXT_COLS * _FONTWIDTH(TextModeFont&), __GPU_MODE_TEXT_ROWS * _FONTHEIGHT(TextModeFont&), 32)
                     _FONT TextModeFont&, GPUImage&
-                    _ECHO "Font " + STR$(TextModeFont&) + " (w=" + STR$(_FONTWIDTH(TextModeFont&)) + "; h=" + STR$(_FONTHEIGHT(TextModeFont&)) + ")"
 
                 CASE __GPU_MODE_HIRES
                     _FREEIMAGE GPUImage&
@@ -961,8 +1004,8 @@ SUB Bus_DeviceActions (a~%)
                 CASE ELSE: _ECHO "ERROR: Invalid video mode!": EXIT SUB
             END SELECT
             GPU.VMode = tmp~%%
-            _ECHO "Video mode set to " + STR$(tmp~%%)
-            '$END IF
+
+
 
         CASE __GSU_GREG_PAGEOFFSET
             SHARED GPU AS GPURegisters
@@ -1162,6 +1205,8 @@ FUNCTION fps!
 END FUNCTION
 
 SUB System_IO
+    WHILE _MOUSEINPUT: WEND
+
 END SUB
 
 
