@@ -130,22 +130,16 @@ Bus_DeviceActions __GSU_GREG_VMODE
 
 
 
-ON TIMER(UPDATEINTERVAL) UpdateScreen
-TIMER ON
-
 DO
     System_CPU
+    t! = TIMER(0.0001)
+    IF NextUpdate! < t! THEN
+        System_GPU
+        SCREEN GPUImage&
+        _DISPLAY
+        NextUpdate! = t! + UPDATEINTERVAL
+    END IF
 LOOP
-
-
-SUB UpdateScreen
-    System_GPU
-    SCREEN GPUImage&
-    '_PUTIMAGE , GPUImage&, 0
-    _DISPLAY
-END SUB
-
-
 
 SUB System_CPU
     SHARED CPU AS CPURegisters
@@ -154,6 +148,8 @@ SUB System_CPU
     STATIC B AS _UNSIGNED _BYTE, I AS _UNSIGNED INTEGER, A AS _UNSIGNED INTEGER 'use STATIC *only* because I think its faster
 
 
+    '_ECHO HEX$(CPU.PC)
+    'SLEEP
     GOSUB Addr_Imm
     op1~%% = B AND &HF0
     op2~%% = B AND &H0F
@@ -345,12 +341,12 @@ SUB System_CPU
 
                     'invalid ops
                 CASE &HA 'OR.M <val>
-                    GOSUB Addr_Imm
-                    CPU.M = CPU.M OR B
+                    GOSUB Addr_Imm_2B
+                    CPU.M = CPU.M OR I
 
                 CASE &HB 'OR.M <addr>
-                    GOSUB Addr_Abs
-                    CPU.M = CPU.M OR B
+                    GOSUB Addr_Abs_2B
+                    CPU.M = CPU.M OR I
 
             END SELECT
 
@@ -414,12 +410,12 @@ SUB System_CPU
 
 
                 CASE &HA 'NOR.M <val>
-                    GOSUB Addr_Imm
-                    CPU.M = ((NOT CPU.M) AND &H0000FFFF) OR B
+                    GOSUB Addr_Imm_2B
+                    CPU.M = ((NOT CPU.M) AND &H0000FFFF) OR I
 
                 CASE &HB 'NOR.M <addr>
-                    GOSUB Addr_Abs
-                    CPU.M = ((NOT CPU.M) AND &H0000FFFF) OR B
+                    GOSUB Addr_Abs_2B
+                    CPU.M = ((NOT CPU.M) AND &H0000FFFF) OR I
             END SELECT
 
 
@@ -460,12 +456,12 @@ SUB System_CPU
 
 
                 CASE &H8 'ADD.M <val>
-                    GOSUB Addr_Imm
-                    CPU.M = CPU.M + B
+                    GOSUB Addr_Imm_2B
+                    CPU.M = CPU.M + I
 
                 CASE &H9 'ADD.M <addr>
-                    GOSUB Addr_Abs
-                    CPU.M = CPU.M + B
+                    GOSUB Addr_Abs_2B
+                    CPU.M = CPU.M + I
 
 
 
@@ -495,6 +491,63 @@ SUB System_CPU
                     I = CPU.PC + 2
                     GOSUB Push_2B
                     CPU.PC = CPU.PC + CPU.M
+
+                CASE ELSE: GOTO InvalidOp
+            END SELECT
+
+
+
+
+        CASE &H30: SELECT CASE op2~%% 'COMP
+                CASE &H0 'COMP.A <val>
+                    GOSUB Addr_Imm
+                    CPU.C = (CPU.A = B)
+
+                CASE &H1 'COMP.A <addr>
+                    GOSUB Addr_Abs
+                    CPU.C = (CPU.A = B)
+
+                CASE &H2 'COMP.A M
+                    GOSUB Addr_M
+                    CPU.C = (CPU.A = B)
+
+                CASE &H3 'COMP.A B
+                    CPU.C = (CPU.A = CPU.B)
+
+
+
+                CASE &H4 'COMP.B <val>
+                    GOSUB Addr_Imm
+                    CPU.C = (CPU.B = B)
+
+                CASE &H5 'COMP.B <addr>
+                    GOSUB Addr_Abs
+                    CPU.C = (CPU.B = B)
+
+                CASE &H6 'COMP.B M
+                    GOSUB Addr_M
+                    CPU.C = (CPU.B = B)
+
+                CASE &H7 'COMP.B A
+                    CPU.C = (CPU.B = CPU.A)
+
+
+
+                CASE &H8 'COMP.M <val>
+                    GOSUB Addr_Imm_2B
+                    CPU.C = (CPU.M = I)
+
+                CASE &H9 'COMP.M <addr>
+                    GOSUB Addr_Abs_2B
+                    CPU.M = (CPU.M = I)
+
+
+                    'invalid ops
+                CASE &HA 'COMP.M M
+                    CPU.C = True
+
+                CASE &HB 'COMP.M A, COMP.M B
+                    CPU.C = ((CPU.M AND &H00FF) = 0) 'essentially (CPU.M = _SHR(CPU.M AND &HFF00, 8))
 
                 CASE ELSE: GOTO InvalidOp
             END SELECT
@@ -539,26 +592,25 @@ SUB System_CPU
 
 
                 CASE &H8 'SUB.M <val>
-                    GOSUB Addr_Imm
-                    CPU.M = CPU.M - B
+                    GOSUB Addr_Imm_2B
+                    CPU.M = CPU.M - I
 
                 CASE &H9 'SUB.M <addr>
-                    GOSUB Addr_Abs
-                    CPU.M = CPU.M - B
+                    GOSUB Addr_Abs_2B
+                    CPU.M = CPU.M - I
 
 
                     'invalid ops
                 CASE &HA 'SUB.M M
-                    CPU.M = (CPU.M - CPU.M) AND (RND * &HFFFF&)
+                    GOSUB addr_m_2b
+                    CPU.M = (CPU.M - I)
 
                 CASE &HB 'SUB.M A, SUB.M B
-                    CPU.M = CPU.M - (_SHR(CPU.M AND &HFF00, 8) AND (RND * &HFFFF&))
+                    CPU.M = CPU.M - _SHR(CPU.M AND &HFF00, 8)
 
                 CASE ELSE: GOTO InvalidOp
             END SELECT
 
-
-            '.....
 
 
 
@@ -781,20 +833,20 @@ SUB System_CPU
 
                     'invalid ops
                 CASE &H8 'AND.M <val>
-                    GOSUB Addr_Imm
-                    CPU.M = (CPU.M AND B) OR (CPU.M AND &HFF00)
+                    GOSUB Addr_Imm_2B
+                    CPU.M = (CPU.M AND I) OR (CPU.M AND &HFF00)
 
                 CASE &H9 'AND.M <addr>
-                    GOSUB Addr_Abs
-                    CPU.M = (CPU.M AND B) OR (CPU.M AND &HFF00)
+                    GOSUB Addr_Abs_2B
+                    CPU.M = (CPU.M AND I) OR (CPU.M AND &HFF00)
 
                 CASE &HA 'XOR.M <val>
-                    GOSUB Addr_Imm
-                    CPU.M = CPU.M XOR B
+                    GOSUB Addr_Imm_2B
+                    CPU.M = CPU.M XOR I
 
-                CASE &HB 'AND.M <addr>
-                    GOSUB Addr_Abs
-                    CPU.M = CPU.M XOR B
+                CASE &HB 'XOR.M <addr>
+                    GOSUB Addr_Abs_2B
+                    CPU.M = CPU.M XOR I
 
             END SELECT
 
@@ -873,7 +925,7 @@ CPU.Carry = (CPU.A > 255) OR _
     B = Bus_Get(CPU.M)
     RETURN
 
-    Addr_M_2B:
+    addr_m_2b:
     I = B2I(Bus_Get(CPU.M), Bus_Get(CPU.M + 1))
     RETURN
 
@@ -889,13 +941,13 @@ CPU.Carry = (CPU.A > 255) OR _
     RETURN
 
     Pull:
-    B = Bus_Get(__MEM_STACK_BEGIN + CPU.StackPtr)
     CPU.StackPtr = CPU.StackPtr - 1
+    B = Bus_Get(__MEM_STACK_BEGIN + CPU.StackPtr)
     RETURN
 
     Pull_2B:
-    I = B2I(Bus_Get(__MEM_STACK_BEGIN + CPU.StackPtr), Bus_Get(__MEM_STACK_BEGIN + CPU.StackPtr + 1))
     CPU.StackPtr = CPU.StackPtr - 2
+    I = B2I(Bus_Get(__MEM_STACK_BEGIN + CPU.StackPtr + 1), Bus_Get(__MEM_STACK_BEGIN + CPU.StackPtr))
     RETURN
 
     Interrupt:

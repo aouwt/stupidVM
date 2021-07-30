@@ -7,30 +7,46 @@
 	
 	
 	load.m	#Text_1
-	subr	PRINT
-	subr	NEWLINE
-	inc.m
-	subr	PRINT
-	subr	NEWLINE
+	subr	FANCYPRINT
 	
-	jump	pc	;speen :D
+	jump	end	;speen :D
 	
 PRINT:
 	load.a	M
-	ifz.a	.ret		;if byte=0 then return
+	ifz.a	RETURN		; if byte=0 then return
 	store.a	GPU_WRITEBYTE
-	inc.m			;set to read next byte
+	inc.m			; set to read next byte
 	jump	PRINT
-.ret:
-	return
+
+
+
+
+FANCYPRINT:
+	load.a	M
+	inc.m
+	
+	ifz.a	RETURN	;null terminated
+	
+	comp.a	#"\n"	;newline
+	if.c	.nl
+	
+	store.a	GPU_WRITEBYTE	;otherwise, print
+	
+	jump	FANCYPRINT
+	
+	
+.nl:	subr	NEWLINE
+	jump	FANCYPRINT
+
 
 NEWLINE:
 	load.a	GPU_WRITEADDR
+	inc.a
 	and.a	#0b11000000	; nearest multiple of 64
+	add.a	#0b01000000
 	store.a	GPU_WRITEADDR
 	
-	comp.a	#0b11000000	; if addr > 192...
-	if.c	.incnext	; ...then inc next
+	ifz.a	.incnext
 	return
 
 .incnext:
@@ -43,6 +59,11 @@ NEWLINE:
 
 
 Text_1:
-	#d	"Hello world!\0"
-Text_2:
-	#d	"This is using two lines!\0"
+	#d	"Hello world!
+How
+   are
+      you?\0"
+
+end:	jump	end
+
+RETURN:	return

@@ -32,7 +32,7 @@
 	add.b m		=>	0x16
 	add.b a		=>	0x17
 	
-	add.m #{value}	=>	0x18 @ value[7:0]
+	add.m #{value}	=>	0x18 @ value[7:0] @ value[15:8]
 	add.m {addr}	=>	0x19 @ addr[7:0] @ addr[15:8]
 	
 	
@@ -55,7 +55,7 @@
 	sub.b m		=>	0x26
 	sub.b a		=>	0x27
 	
-	sub.m #{value}	=>	0x28 @ value[7:0]
+	sub.m #{value}	=>	0x28 @ value[7:0] @ value[15:8]
 	sub.m {addr}	=>	0x29 @ addr[7:0] @ addr[15:8]
 	
 	
@@ -69,7 +69,7 @@
 	comp.b m	=>	0x36
 	comp.b a	=>	0x37
 	
-	comp.m #{value}	=>	0x38 @ value[7:0]
+	comp.m #{value}	=>	0x38 @ value[7:0] @ value[15:8]
 	comp.m {addr}	=>	0x39 @ addr[7:0] @ addr[15:8]
 	
 	
