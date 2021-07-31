@@ -9,6 +9,27 @@
 	load.m	#Text_1
 	subr	FANCYPRINT
 	
+	load.m	#440
+	store.m	SPU_CH1_PITCH
+	
+	load.m	#400
+	store.m	SPU_CH2_PITCH
+	
+	load.a	#255
+	store.a	SPU_CH1_VOL
+	store.a	SPU_CH2_VOL	
+	
+	load.m	#1
+.loop:
+	;store.m	SPU_CH1_WAVE
+	store.m	SPU_CH2_WAVE
+	lsh.m
+	inc.m
+	subr	WAIT
+	subr	WAIT
+	subr	WAIT
+	jump	.loop
+	
 	jump	end	;speen :D
 	
 PRINT:
@@ -59,11 +80,24 @@ NEWLINE:
 
 
 Text_1:
-	#d	"Hello world!
-How
-   are
-      you?\0"
+	#d	"Hello world!\n"
+	#d	"This is a testing program\n"
+	#d	"Playing 440Hz...\n\0"
+Text_2:
+	#d	"Playing 880hz...\n\0"
 
 end:	jump	end
 
+
+WAIT:
+	load.a	#0
+	
+.loop1:	load.b	#0
+	
+.loop2:	inc.b
+	ifnz.b	.loop2
+	
+	inc.a
+	ifnz.a	.loop1
+	
 RETURN:	return

@@ -31,6 +31,7 @@ TYPE SoundRegisters
     Ch1 AS LONG
     Ch2 AS LONG
     Ch3 AS LONG
+    BufferLen AS _UNSIGNED INTEGER
 END TYPE
 
 CONST _
@@ -114,7 +115,12 @@ DIM SHARED GPUImage&, TextModeFont&
 DIM Pallete_Color(15) AS _UNSIGNED LONG
 DIM Pallete_HiColor(255) AS _UNSIGNED LONG
 
-DIM SHARED CPU AS CPURegisters, GPU AS GPURegisters
+DIM SHARED CPU AS CPURegisters, GPU AS GPURegisters, Snd AS SoundRegisters
+
+Snd.BufferLen = _SNDRATE * (1 / 60)
+Snd.Ch1 = _SNDOPENRAW
+Snd.Ch2 = _SNDOPENRAW
+
 
 LoadROM "test.rom"
 CPU.PC = __MAP_STATICROM_BEGIN
@@ -1106,48 +1112,79 @@ END SUB
 
 $IF SOUND = WAVE THEN
     SUB System_Sound
-        STATIC Snd AS SoundRegisters
+        SHARED Snd AS SoundRegisters
 
-        STATIC Buffer(_SNDRATE * (1 / 60), 0 TO 1) AS SINGLE
+        TYPE Channel
+            VolReg AS _UNSIGNED _BYTE
+            Vol AS SINGLE
+            Freq AS _UNSIGNED INTEGER
+            Frac AS _UNSIGNED INTEGER
+            Play AS _BYTE
+        END TYPE
 
-        STATIC Waveform(16) AS SINGLE '16 samples
+        STATIC AS Channel Ch1, Ch2
+        STATIC AS SINGLE Waveform1(15), Waveform2(15) '16 samples
+        STATIC AS _UNSIGNED LONG Time
+
+        Ch1.VolReg = DeviceRAM(__GSU_SREG_CH1_VOL)
+        Ch1.Freq = B2I(DeviceRAM(__GSU_SREG_CH1_PITCH), DeviceRAM(__GSU_SREG_CH1_PITCH + 1))
+
+        Ch1.Play = (Ch1.VolReg <> 0) AND (Ch1.Freq <> 0)
+        IF Ch1.Play THEN
+            Ch1.Vol = Ch1.VolReg / 1024
+            Ch1.Frac = _SNDRATE / Ch1.Freq
+        ELSE Ch1.Frac = 1
+        END IF
 
 
-        'Channel 1
+        Ch2.VolReg = DeviceRAM(__GSU_SREG_CH2_VOL)
+        Ch2.Freq = B2I(DeviceRAM(__GSU_SREG_CH2_PITCH), DeviceRAM(__GSU_SREG_CH2_PITCH + 1))
+
+        Ch2.Play = (Ch2.VolReg <> 0) AND (Ch2.Freq <> 0)
+        IF Ch2.Play THEN
+            Ch2.Vol = Ch2.VolReg / 1024
+            Ch2.Frac = _SNDRATE / Ch2.Freq
+        ELSE Ch2.Frac = 1
+        END IF
+
         'make the waveform
-        p~%% = 0
-        i~%% = 0: DO
-            b~%% = DeviceRAM(__GSU_SREG_CH1_WAVE + p~%%)
-            Waveform(i~%%) = _SHR(b~%% AND &B11000000, 6) * __GSU_SREG_CH1_VOL / 1024
-            Waveform(i~%% + 1) = _SHR(b~%% AND &B00110000, 4) * __GSU_SREG_CH1_VOL / 1024
-            Waveform(i~%% + 2) = _SHR(b~%% AND &B00001100, 2) * __GSU_SREG_CH1_VOL / 1024
-            Waveform(i~%% + 3) = (b~%% AND &B00000011) * __GSU_SREG_CH1_VOL / 1024
-            p~%% = p~%% + 1
-        i~%% = i~%% + 4: LOOP UNTIL i~%% = 16
+        IF (Ch1.Play OR Ch2.Play) THEN
+            p~%% = 0
+            i~%% = 0: DO
+                IF Ch1.Play THEN
+                    b~%% = DeviceRAM(__GSU_SREG_CH1_WAVE + p~%%)
+                    Waveform1(i~%%) = _SHR(b~%% AND &B11000000, 6) * Ch1.Vol
+                    Waveform1(i~%% + 1) = _SHR(b~%% AND &B00110000, 4) * Ch1.Vol
+                    Waveform1(i~%% + 2) = _SHR(b~%% AND &B00001100, 2) * Ch1.Vol
+                    Waveform1(i~%% + 3) = (b~%% AND &B00000011) * Ch1.Vol
+                END IF
 
-        'play it here
-        frac! = 1 / _SNDRATE
-        freq~% = B2I(DeviceRAM(__GSU_SREG_CH1_PITCH), DeviceRAM(__GSU_SREG_CH1_PITCH + 1))
+                IF Ch2.Play THEN
+                    b~%% = DeviceRAM(__GSU_SREG_CH2_WAVE + p~%%)
+                    Waveform2(i~%%) = _SHR(b~%% AND &B11000000, 6) * Ch2.Vol
+                    Waveform2(i~%% + 1) = _SHR(b~%% AND &B00110000, 4) * Ch2.Vol
+                    Waveform2(i~%% + 2) = _SHR(b~%% AND &B00001100, 2) * Ch2.Vol
+                    Waveform2(i~%% + 3) = (b~%% AND &B00000011) * Ch2.Vol
+                END IF
+                p~%% = p~%% + 1
+            i~%% = i~%% + 4: LOOP UNTIL i~%% = 16
 
-        'Channel 2
-        'make the waveform
-        p~%% = 0
-        i~%% = 0: DO
-            b~%% = DeviceRAM(__GSU_SREG_CH2_WAVE + p~%%)
-            Waveform(i~%%) = _SHR(b~%% AND &B11000000, 6) * __GSU_SREG_CH2_VOL / 1024
-            Waveform(i~%% + 1) = _SHR(b~%% AND &B00110000, 4) * __GSU_SREG_CH2_VOL / 1024
-            Waveform(i~%% + 2) = _SHR(b~%% AND &B00001100, 2) * __GSU_SREG_CH2_VOL / 1024
-            Waveform(i~%% + 3) = (b~%% AND &B00000011) * __GSU_SREG_CH2_VOL / 1024
-            p~%% = p~%% + 1
-        i~%% = i~%% + 4: LOOP UNTIL i~%% = 16
+            'play it here
+            DO
+                IF Ch1.Play THEN _SNDRAW Waveform1((Time MOD Ch1.Frac) AND &HF), , Snd.Ch1 ELSE _SNDRAW 0, , Snd.Ch1
+                IF Ch2.Play THEN _SNDRAW Waveform2((Time MOD Ch2.Frac) AND &HF), , Snd.Ch2 ELSE _SNDRAW 0, , Snd.Ch2
+            Time = Time + 1: LOOP UNTIL _SNDRAWLEN > 0.1
 
-        'play it here
-        'todo
+        ELSE
+            DO: _SNDRAW 0: LOOP UNTIL _SNDRAWLEN > 0.1
+        END IF
     END SUB
 $END IF
 
 $IF GPU = BITMAP THEN
     SUB System_GPU
+        System_Sound
+        System_Sound
         SHARED GPUImage&, TextModeFont&, GPU AS GPURegisters
         SHARED VRAM() AS _UNSIGNED _BYTE
 
