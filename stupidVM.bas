@@ -1,3 +1,4 @@
+'$DEBUG
 $RESIZE:STRETCH
 $CONSOLE
 CONST True = -1, False = 0
@@ -61,15 +62,16 @@ CONST __MAP_DEVICE_GPU = __MAP_DEVICEREGS_BEGIN + &H10
 CONST __MAP_DEVICE_SND = __MAP_DEVICEREGS_BEGIN + &H20
 
 
-CONST __SYS_BANKNO = __MAP_DEVICE_SYS + &H0
-CONST __SYS_IO_MOUSE = __MAP_DEVICE_SYS + &H1
-CONST __SYS_IO_KEYBOARD = __MAP_DEVICE_SYS + &H2
+CONST __SYS_BANKNO = __MAP_DEVICE_SYS + &H0 '1 byte
+CONST __SYS_IO_MOUSE = __MAP_DEVICE_SYS + &H1 '1 byte
+CONST __SYS_IO_KEYBOARD = __MAP_DEVICE_SYS + &H2 '2 bytes
+CONST __SYS_TIMER = __MAP_DEVICE_SYS + &H4 '1 byte
 
 
 CONST __GPU_REG_WRITE_BYTE = __MAP_DEVICE_GPU + &H0 '1 byte
 CONST __GPU_REG_WRITE_ADDR = __MAP_DEVICE_GPU + &H1 '2 bytes
-CONST __GPU_REG_PAGEOFFSET = __MAP_DEVICE_GPU + &H2 '1 byte
-CONST __GPU_REG_VMODE = __MAP_DEVICE_GPU + &H3 '1 byte
+CONST __GPU_REG_PAGEOFFSET = __MAP_DEVICE_GPU + &H3 '1 byte
+CONST __GPU_REG_VMODE = __MAP_DEVICE_GPU + &H4 '1 byte
 CONST __GPU_REG_WRITE = __GPU_REG_WRITE_BYTE
 
 
@@ -95,8 +97,7 @@ CONST __SND_REG_WRITE_ADDR = __MAP_DEVICE_SND + &HD '1 byte
 CONST __SND_REG_WRITE_BYTE = __MAP_DEVICE_SND + &HE '1 byte
 CONST __SND_REG_WRITE = __SND_REG_WRITE_BYTE '1 btye
 
-CONST __SND_SRAMSIZE = 127
-
+CONST __SND_BUFFERLEN = 1 / 60
 
 CONST __BANK_RAMBANKS = 10
 CONST __BANK_ROMBANKS = 1
@@ -111,19 +112,15 @@ DIM SHARED BankedRAM(__MAP_BANK_BEGIN TO __MAP_BANK_END, __BANK_RAMBANKS) AS _UN
 DIM SHARED BankedROM(__MAP_BANK_BEGIN TO __MAP_BANK_END, __BANK_ROMBANKS) AS _UNSIGNED _BYTE
 DIM SHARED DeviceRAM(__MAP_DEVICEREGS_BEGIN TO __MAP_DEVICEREGS_END) AS _UNSIGNED _BYTE
 DIM SHARED VRAM(__GPU_VRAMSIZE) AS _UNSIGNED _BYTE
-DIM SHARED SndRAM(__SND_SRAMSIZE) AS _UNSIGNED _BYTE
-'DIM SHARED Waveforms(4, 100010100101010010010101001000)
 
 
 DIM SHARED GPUImage&, TextModeFont&
 DIM Pallete_Color(15) AS _UNSIGNED LONG
 DIM Pallete_HiColor(255) AS _UNSIGNED LONG
 
-DIM SHARED CPU AS CPURegisters, GPU AS GPURegisters, Snd AS SoundRegisters
+DIM SHARED Waveforms(3, 255) AS SINGLE
 
-Snd.BufferLen = _SNDRATE * (1 / 60)
-'Snd.Ch1 = _SNDOPENRAW
-'Snd.Ch2 = _SNDOPENRAW
+DIM SHARED CPU AS CPURegisters, GPU AS GPURegisters
 
 
 LoadROM "test.rom"
@@ -132,20 +129,21 @@ GPU.VMode = 100
 
 _ECHO "Generating palletes..."
 System_GPU_GeneratePalletes
+System_Sound_GenWaveforms
 _ECHO "done"
 
 TextModeFont& = 8
 GPUImage& = _NEWIMAGE(8, 8, 32)
-Bus_DeviceActions __GSU_GREG_VMODE
+Bus_DeviceActions __GSU_REG_VMODE
 
 
-
+SCREEN _NEWIMAGE(640, 480, 32)
 DO
     System_CPU
     t! = TIMER(0.0001)
     IF NextUpdate! < t! THEN
         System_GPU
-        SCREEN GPUImage&
+        _PUTIMAGE , GPUImage&, 0
         _DISPLAY
         NextUpdate! = t! + UPDATEINTERVAL
     END IF
@@ -1012,14 +1010,14 @@ SUB Bus_DeviceActions (a~%)
             STATIC mousedata~%%
             'ok so this is a little confusing
             IF _MOUSEINPUT THEN
-                tmp%% = SGN(_MOUSEMOVEMENTX):                      mousedata~%% = (tmp%% = -1          )    _
-                                                                          AND _SHL(tmp%% = 1           , 1)
-                tmp%% = SGN(_MOUSEMOVEMENTY): mousedata~%% = mousedata~%% AND _SHL(tmp%% = -1          , 2) _
-                                                                          AND _SHL(tmp%% = 1           , 3) _
-                                                                          AND _SHL(_MOUSEWHEEL = -1    , 4) _
-                                                                          AND _SHL(_MOUSEWHEEL = 1     , 5) _
-                                                                          AND _SHL(_MOUSEBUTTON(1) = -1, 6) _
-                                                                          AND _SHL(_MOUSEBUTTON(2) = -1, 7)
+tmp%% = SGN(_MOUSEMOVEMENTX):                      mousedata~%% = (tmp%% = -1          )    _
+AND _SHL(tmp%% = 1           , 1)
+tmp%% = SGN(_MOUSEMOVEMENTY): mousedata~%% = mousedata~%% AND _SHL(tmp%% = -1          , 2) _
+AND _SHL(tmp%% = 1           , 3) _
+AND _SHL(_MOUSEWHEEL = -1    , 4) _
+AND _SHL(_MOUSEWHEEL = 1     , 5) _
+AND _SHL(_MOUSEBUTTON(1) = -1, 6) _
+AND _SHL(_MOUSEBUTTON(2) = -1, 7)
             END IF
             DeviceRAM(__SYS_IO_MOUSE) = mousedata~%%
 
@@ -1029,12 +1027,15 @@ SUB Bus_DeviceActions (a~%)
             IF tmp~& < 256 THEN DeviceRAM(__SYS_IO_KEYBOARD) = tmp~& ELSE DeviceRAM(__SYS_IO_KEYBOARD) = 0
 
 
+        CASE __SYS_TIMER
+            DeviceRAM(__SYS_TIMER) = (TIMER * 16)
+
 
         CASE __GPU_REG_WRITE
             SHARED VRAM() AS _UNSIGNED _BYTE
             VRAM(B2I(DeviceRAM(__GPU_REG_WRITE_ADDR), DeviceRAM(__GPU_REG_WRITE_ADDR + 1))) = DeviceRAM(__GPU_REG_WRITE_BYTE)
 
-            i~%% = DeviceRAM(__GSU_GREG_WRITE_ADDR) 'incrememnt it
+            i~%% = DeviceRAM(__GPU_REG_WRITE_ADDR) 'incrememnt it
             DeviceRAM(__GPU_REG_WRITE_ADDR + 1) = DeviceRAM(__GPU_REG_WRITE_ADDR + 1) - (i~%% = 255)
             DeviceRAM(__GPU_REG_WRITE_ADDR) = i~%% + 1
 
@@ -1074,8 +1075,9 @@ SUB Bus_DeviceActions (a~%)
             GPU.PageOffset = _SHL(DeviceRAM(__GPU_REG_PAGEOFFSET), 8)
 
         CASE __SND_REG_WRITE
-            SHARED Snd AS SoundRegisters, SndRAM() AS _UNSIGNED _BYTE
-            sndram(deviceram(__snd_reg_write_addr) and &b01111111
+            SHARED Waveforms() AS SINGLE
+            Waveforms(3, DeviceRAM(__SND_REG_WRITE_ADDR)) = DeviceRAM(__SND_REG_WRITE_BYTE) / 255
+
     END SELECT
 END SUB
 
@@ -1118,89 +1120,23 @@ SUB LoadROM (f$)
     CLOSE f%
 END SUB
 
-'SUB System_Sound       IGNORE THIS
-'    SHARED Snd AS SoundRegisters
-
-'    TYPE Channel
-'        VolReg AS _UNSIGNED _BYTE
-'        Vol AS SINGLE
-'        Freq AS _UNSIGNED INTEGER
-'        Frac AS _UNSIGNED INTEGER
-'        Play AS _BYTE
-'    END TYPE
-
-'    STATIC AS Channel Ch1, Ch2
-'    STATIC AS SINGLE Waveform1(15), Waveform2(15) '16 samples
-'    STATIC AS _UNSIGNED LONG Time
-
-'    Ch1.VolReg = DeviceRAM(__GSU_SREG_CH1_VOL)
-'    Ch1.Freq = B2I(DeviceRAM(__GSU_SREG_CH1_PITCH), DeviceRAM(__GSU_SREG_CH1_PITCH + 1))
-
-'    Ch1.Play = (Ch1.VolReg <> 0) AND (Ch1.Freq <> 0)
-'    IF Ch1.Play THEN
-'        Ch1.Vol = Ch1.VolReg / 1024
-'        Ch1.Frac = _SNDRATE / Ch1.Freq
-'    ELSE Ch1.Frac = 1
-'    END IF
-
-
-'    Ch2.VolReg = DeviceRAM(__GSU_SREG_CH2_VOL)
-'    Ch2.Freq = B2I(DeviceRAM(__GSU_SREG_CH2_PITCH), DeviceRAM(__GSU_SREG_CH2_PITCH + 1))
-
-'    Ch2.Play = (Ch2.VolReg <> 0) AND (Ch2.Freq <> 0)
-'    IF Ch2.Play THEN
-'        Ch2.Vol = Ch2.VolReg / 1024
-'        Ch2.Frac = _SNDRATE / Ch2.Freq
-'    ELSE Ch2.Frac = 1
-'    END IF
-
-'    'make the waveform
-'    IF (Ch1.Play OR Ch2.Play) THEN
-'        p~%% = 0
-'        i~%% = 0: DO
-'            IF Ch1.Play THEN
-'                b~%% = DeviceRAM(__GSU_SREG_CH1_WAVE + p~%%)
-'                Waveform1(i~%%) = _SHR(b~%% AND &B11000000, 6) * Ch1.Vol
-'                Waveform1(i~%% + 1) = _SHR(b~%% AND &B00110000, 4) * Ch1.Vol
-'                Waveform1(i~%% + 2) = _SHR(b~%% AND &B00001100, 2) * Ch1.Vol
-'                Waveform1(i~%% + 3) = (b~%% AND &B00000011) * Ch1.Vol
-'            END IF
-
-'            IF Ch2.Play THEN
-'                b~%% = DeviceRAM(__GSU_SREG_CH2_WAVE + p~%%)
-'                Waveform2(i~%%) = _SHR(b~%% AND &B11000000, 6) * Ch2.Vol
-'                Waveform2(i~%% + 1) = _SHR(b~%% AND &B00110000, 4) * Ch2.Vol
-'                Waveform2(i~%% + 2) = _SHR(b~%% AND &B00001100, 2) * Ch2.Vol
-'                Waveform2(i~%% + 3) = (b~%% AND &B00000011) * Ch2.Vol
-'            END IF
-'            p~%% = p~%% + 1
-'        i~%% = i~%% + 4: LOOP UNTIL i~%% = 16
-
-'        'play it here
-'        DO
-'            IF Ch1.Play THEN _SNDRAW Waveform1((Time MOD Ch1.Frac) AND &HF), , Snd.Ch1 ELSE _SNDRAW 0, , Snd.Ch1
-'            IF Ch2.Play THEN _SNDRAW Waveform2((Time MOD Ch2.Frac) AND &HF), , Snd.Ch2 ELSE _SNDRAW 0, , Snd.Ch2
-'        Time = Time + 1: LOOP UNTIL _SNDRAWLEN > 0.1
-
-'    ELSE
-'        DO: _SNDRAW 0: LOOP UNTIL _SNDRAWLEN > 0.1
-'    END IF
-'END SUB
-
-
 
 SUB System_Sound
 
+    CONST PwrOf2 = 2 ^ (1 / 12)
+
     TYPE Channel
         Wave AS _UNSIGNED _BYTE
-        Freq AS _UNSIGNED INTEGER
+        'Freq AS _UNSIGNED INTEGER
         Frac AS _UNSIGNED INTEGER
         Duty AS _UNSIGNED _BYTE
-        Vol AS _UNSIGNED _BYTE
+        Vol AS SINGLE
     END TYPE
 
+    STATIC Time AS _UNSIGNED _INTEGER64
     STATIC Ch(3) AS Channel
-    STATIC Wave(3) AS SINGLE
+    SHARED Waveforms() AS SINGLE
+    DIM Wave(3, 255) AS SINGLE
 
 
 
@@ -1211,19 +1147,18 @@ SUB System_Sound
     Ch(2).Wave = _SHR(DeviceRAM(__SND_REG_WAVEFORMS) AND &B00001100, 2)
     Ch(3).Wave = DeviceRAM(__SND_REG_WAVEFORMS) AND &B00000011
 
-    'vol bytes (numbers represent channels): 00001111 22223333
-    Ch(0).Vol = _SHR(DeviceRAM(__SND_REG_VOLS) AND &B11110000, 4)
-    Ch(1).Vol = DeviceRAM(__SND_REG_VOLS) AND &B00001111
-    Ch(2).Vol = _SHR(DeviceRAM(__SND_REG_VOLS + 1) AND &B11110000, 4)
-    Ch(3).Vol = DeviceRAM(__SND_REG_VOLS + 1) AND &B00001111
+    'vol bytes (numbers represent channels): 00001111 22223333      'we need to get a SINGLE value
+    Ch(0).Vol = _SHR(DeviceRAM(__SND_REG_VOLS) AND &B11110000, 4) / 16
+    Ch(1).Vol = (DeviceRAM(__SND_REG_VOLS) AND &B00001111) / 16
+    Ch(2).Vol = _SHR(DeviceRAM(__SND_REG_VOLS + 1) AND &B11110000, 4) / 16
+    Ch(3).Vol = (DeviceRAM(__SND_REG_VOLS + 1) AND &B00001111) / 16
 
-    'duty bytes (numbers represent channels): 00001111 22223333
-    Ch(0).Duty = _SHR(DeviceRAM(__SND_REG_DUTIES) AND &B11110000, 4)
-    Ch(1).Duty = DeviceRAM(__SND_REG_DUTIES) AND &B00001111
-    Ch(2).Duty = _SHR(DeviceRAM(__SND_REG_DUTIES + 1) AND &B11110000, 4)
-    Ch(3).Duty = DeviceRAM(__SND_REG_DUTIES + 1) AND &B00001111
-
-
+    'duty bytes (numbers represent channels): 00001111 22223333      'note: we need to amplify the duty to improve speed later on, so we "invert" this one
+    'also because reasons we need to dec by one so we do that here
+    Ch(0).Duty = _SHR(DeviceRAM(__SND_REG_DUTIES) AND &B11110000, 1) OR &B10000000
+    Ch(1).Duty = _SHL(DeviceRAM(__SND_REG_DUTIES) AND &B00001111, 3) OR &B10000000
+    Ch(2).Duty = _SHR(DeviceRAM(__SND_REG_DUTIES + 1) AND &B11110000, 1) OR &B10000000
+    Ch(3).Duty = _SHL(DeviceRAM(__SND_REG_DUTIES + 1) AND &B00001111, 3) OR &B10000000
 
     ch~%% = 0: DO
         i~%% = _SHL(ch~%%, 1) 'fastest way to do *2
@@ -1232,29 +1167,50 @@ SUB System_Sound
 
 
 
+        'REM f(n) = 2^((n-29)/12) * 440 'where n is semitones and f is frequency
+        'REM N = note + (s / 127)       'where N is final semitones, n is semitones in reg, and s is shift
+        ''therefore:
+        'REM f(n,s) = 2^(((n+(s/127))/12) * 440  'where f is frequency, n is semitones in reg, and s is shift
+        '        freq! = (2 ^ (((note~%% + (shift%% / 127)) - 49) / 12)) * 440
 
-        REM f(n) = 2^((n-29)/12) * 440 'where n is semitones and f is frequency
-        REM N = note + (s / 127)       'where N is final semitones, n is semitones in reg, and s is shift
-        'therefore:
-        REM f(n,s) = 2^(((n+(s/127))/12) * 440  'where f is frequency, n is semitones in reg, and s is shift
-        '
-        Ch(ch~%%).Freq = (2 ^ (((note~%% + (shift%% / 127)) - 49) / 12)) * 440
-        Ch(ch~%%).Frac = _SNDRATE / Ch(ch~%%).Freq
+        freq! = (PwrOf2 ^ (note~%% - 49)) * 440
+        'IF freq! = 0 THEN freq! = 1
+        Ch(ch~%%).Frac = _SNDRATE / freq!
 
 
+        IF Ch(ch~%%).Frac THEN
+            i~%% = 0: DO
+                Wave(ch~%%, i~%%) = Waveforms(Ch(ch~%%).Wave, i~%%) * Ch(ch~%%).Vol
+            i~%% = i~%% + 1: LOOP UNTIL i~%% >= Ch(ch~%%).Duty
+        ELSE Ch(ch~%%).Frac = 1
+        END IF
+
+    ch~%% = ch~%% + 1: LOOP UNTIL ch~%% = 4
 
 
-    ch~%% = ch~%% + 1: LOOP UNTIL ch~%% = 3
+    DO
+        _SNDRAW (Wave(0, (Time MOD Ch(0).Frac) AND &HFF) + Wave(1, (Time MOD Ch(1).Frac) AND &HFF) + Wave(2, (Time MOD Ch(2).Frac) AND &HFF) + Wave(3, (Time MOD Ch(3).Frac) AND &HFF)) / 4
+    Time = Time + 1: LOOP UNTIL _SNDRAWLEN >= __SND_BUFFERLEN
 END SUB
 
 
 
 
 
+SUB System_Sound_GenWaveforms
+    SHARED Waveforms() AS SINGLE
+    FOR i~%% = 0 TO 255
+        Waveforms(0, i~%%) = 1
+        Waveforms(1, i~%%) = ABS(i~%% - 127) / 127
+        Waveforms(2, i~%%) = RND
+    NEXT
+    'Waveforms(0, 255) = 0 'becauase yes
+END SUB
+
 
 
 SUB System_GPU
-    'System_Sound
+    System_Sound
     'System_Sound
     SHARED GPUImage&, TextModeFont&, GPU AS GPURegisters
     SHARED VRAM() AS _UNSIGNED _BYTE
@@ -1357,11 +1313,6 @@ SUB System_GPU_GeneratePalletes
 END SUB
 
 
-SUB System_Sound_GenerateWaveforms
-
-END SUB
-
-
 FUNCTION fps!
     STATIC last AS SINGLE
     fps = 1 / (TIMER(0.00001) - last)
@@ -1374,30 +1325,30 @@ SUB System_IO
 END SUB
 
 
-SUB System_GPU_Test (timg&)
-    _SOURCE timg&
+'SUB System_GPU_Test (timg&)
+'    _SOURCE timg&
 
-    SELECT CASE __GPU_MODE_HIRES
-        CASE __GPU_MODE_HIRES
-            w~% = _WIDTH(timg&): h~% = _HEIGHT(timg&)
-            y~% = 0: DO
-                x~% = 0: DO
+'    SELECT CASE __GPU_MODE_HIRES
+'        CASE __GPU_MODE_HIRES
+'            w~% = _WIDTH(timg&): h~% = _HEIGHT(timg&)
+'            y~% = 0: DO
+'                x~% = 0: DO
 
-                    Bus_Write __GSU_GREG_WRITE_ADDR, (i~% AND &H00FF&)
-                    Bus_Write __GSU_GREG_WRITE_ADDR + 1, _SHR(i~% AND &HFF00&, 8)
+'                    Bus_Write __GSU_GREG_WRITE_ADDR, (i~% AND &H00FF&)
+'                    Bus_Write __GSU_GREG_WRITE_ADDR + 1, _SHR(i~% AND &HFF00&, 8)
 
 
-    Bus_Write __GSU_GREG_WRITE_BYTE, (_RED32(POINT(x~%    , y~%)) AND 1)    OR _
-    _SHL(_RED32(POINT(x~% + 1, y~%)) AND 1, 1) OR _
-    _SHL(_RED32(POINT(x~% + 2, y~%)) AND 1, 2) OR _
-    _SHL(_RED32(POINT(x~% + 3, y~%)) AND 1, 3) OR _
-    _SHL(_RED32(POINT(x~% + 4, y~%)) AND 1, 4) OR _
-    _SHL(_RED32(POINT(x~% + 5, y~%)) AND 1, 5) OR _
-    _SHL(_RED32(POINT(x~% + 6, y~%)) AND 1, 6) OR _
-    _SHL(_RED32(POINT(x~% + 7, y~%)) AND 1, 7)
-                    i~% = i~% + 1
+'    Bus_Write __GSU_GREG_WRITE_BYTE, (_RED32(POINT(x~%    , y~%)) AND 1)    OR _
+'    _SHL(_RED32(POINT(x~% + 1, y~%)) AND 1, 1) OR _
+'    _SHL(_RED32(POINT(x~% + 2, y~%)) AND 1, 2) OR _
+'    _SHL(_RED32(POINT(x~% + 3, y~%)) AND 1, 3) OR _
+'    _SHL(_RED32(POINT(x~% + 4, y~%)) AND 1, 4) OR _
+'    _SHL(_RED32(POINT(x~% + 5, y~%)) AND 1, 5) OR _
+'    _SHL(_RED32(POINT(x~% + 6, y~%)) AND 1, 6) OR _
+'    _SHL(_RED32(POINT(x~% + 7, y~%)) AND 1, 7)
+'                    i~% = i~% + 1
 
-                x~% = x~% + 8: LOOP UNTIL x~% = w~%
-            y~% = y~% + 1: LOOP UNTIL y~% = h~%
-    END SELECT
-END SUB
+'                x~% = x~% + 8: LOOP UNTIL x~% = w~%
+'            y~% = y~% + 1: LOOP UNTIL y~% = h~%
+'    END SELECT
+'END SUB

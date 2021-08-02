@@ -9,25 +9,27 @@
 	load.m	#Text_1
 	subr	FANCYPRINT
 	
-	load.m	#440
-	store.m	SPU_CH1_PITCH
+	load.a	#0xFF
+	store.a	SND_VOL
 	
-	load.m	#400
-	store.m	SPU_CH2_PITCH
+	load.a	#0x01010101
+	store.a	SND_WAVE
 	
-	load.a	#255
-	store.a	SPU_CH1_VOL
-	store.a	SPU_CH2_VOL	
+	;load.a	#50
+	;store.a	SND_CH1_NOTE
 	
-	load.m	#1
+	load.a	#0b00000111
+	store.a	SND_DUTY
+	
+	
+	jump	end
+	
+	
 .loop:
-	;store.m	SPU_CH1_WAVE
-	store.m	SPU_CH2_WAVE
-	lsh.m
-	inc.m
-	subr	WAIT
-	subr	WAIT
-	subr	WAIT
+	load.a	SND_CH1_NOTE
+	inc.a
+	store.a	SND_CH1_NOTE
+	;subr	WAIT
 	jump	.loop
 	
 	jump	end	;speen :D
