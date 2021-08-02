@@ -1,0 +1,6 @@
+0	Define waveform (2 bits per channel)
+1-2	Volume (4 bits per channel)
+3-4	Duty (4 bits per channel)
+5-C	Note (1 byte per channel)	Pitch bend (1 byte per channel)
+D	SRAM addr to write/read	(MSB is R/W)
+E	Val of SRAM addr to write/read

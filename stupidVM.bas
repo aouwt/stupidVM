@@ -2,7 +2,8 @@ $RESIZE:STRETCH
 $CONSOLE
 CONST True = -1, False = 0
 
-$LET GSU = BITMAP
+$LET GPU = BITMAP
+$LET SOUND = ARB
 
 TYPE CPURegisters
     A AS _UNSIGNED _BYTE
@@ -28,9 +29,6 @@ TYPE BankRegisters
 END TYPE
 
 TYPE SoundRegisters
-    Ch1 AS LONG
-    Ch2 AS LONG
-    Ch3 AS LONG
     BufferLen AS _UNSIGNED INTEGER
 END TYPE
 
@@ -59,7 +57,8 @@ __MAP_DEVICEREGS_SIZE = __MAP_DEVICEREGS_BEGIN - __MAP_DEVICEREGS_END
 
 
 CONST __MAP_DEVICE_SYS = __MAP_DEVICEREGS_BEGIN + &H00
-CONST __MAP_DEVICE_GSU = __MAP_DEVICEREGS_BEGIN + &H10
+CONST __MAP_DEVICE_GPU = __MAP_DEVICEREGS_BEGIN + &H10
+CONST __MAP_DEVICE_SND = __MAP_DEVICEREGS_BEGIN + &H20
 
 
 CONST __SYS_BANKNO = __MAP_DEVICE_SYS + &H0
@@ -67,37 +66,37 @@ CONST __SYS_IO_MOUSE = __MAP_DEVICE_SYS + &H1
 CONST __SYS_IO_KEYBOARD = __MAP_DEVICE_SYS + &H2
 
 
-$IF GSU = BITMAP THEN
-    $LET SOUND = WAVE
-    $LET GPU = BITMAP
-    CONST __GSU_GREG_WRITE_BYTE = __MAP_DEVICE_GSU + &H0 '1 byte
-    CONST __GSU_GREG_WRITE_ADDR = __MAP_DEVICE_GSU + &H1 '2 bytes
-    CONST __GSU_GREG_PAGEOFFSET = __MAP_DEVICE_GSU + &H2 '1 byte
-    CONST __GSU_GREG_VMODE = __MAP_DEVICE_GSU + &H3 '1 byte
-    CONST __GSU_GREG_WRITE = __GSU_GREG_WRITE_BYTE
-
-    CONST __GSU_SREG_CH1_WAVE = __MAP_DEVICE_GSU + &H4 '4 bytes
-    CONST __GSU_SREG_CH2_WAVE = __MAP_DEVICE_GSU + &H8 '4 bytes
-    CONST __GSU_SREG_CH1_PITCH = __MAP_DEVICE_GSU + &HB '2 bytes
-    CONST __GSU_SREG_CH2_PITCH = __MAP_DEVICE_GSU + &HD '2 bytes
-    CONST __GSU_SREG_CH1_VOL = __MAP_DEVICE_GSU + &HE '1 byte
-    CONST __GSU_SREG_CH2_VOL = __MAP_DEVICE_GSU + &HF '1 byte
+CONST __GPU_REG_WRITE_BYTE = __MAP_DEVICE_GPU + &H0 '1 byte
+CONST __GPU_REG_WRITE_ADDR = __MAP_DEVICE_GPU + &H1 '2 bytes
+CONST __GPU_REG_PAGEOFFSET = __MAP_DEVICE_GPU + &H2 '1 byte
+CONST __GPU_REG_VMODE = __MAP_DEVICE_GPU + &H3 '1 byte
+CONST __GPU_REG_WRITE = __GPU_REG_WRITE_BYTE
 
 
-    CONST __GPU_MODE_TEXT = 0
-    CONST __GPU_MODE_HIRES = 1
-    CONST __GPU_MODE_COLOR = 2
-    CONST __GPU_MODE_HICOLOR = 3
+CONST __GPU_MODE_TEXT = 0
+CONST __GPU_MODE_HIRES = 1
+CONST __GPU_MODE_COLOR = 2
+CONST __GPU_MODE_HICOLOR = 3
 
-    CONST __GPU_MODE_TEXT_COLS = 64, __GPU_MODE_TEXT_ROWS = 32
-    CONST __GPU_MODE_HIRES_WIDTH = 512, __GPU_MODE_HIRES_HEIGHT = 512
-    CONST __GPU_MODE_COLOR_WIDTH = 256, __GPU_MODE_COLOR_HEIGHT = 256
-    CONST __GPU_MODE_HICOLOR_WIDTH = 128, __GPU_MODE_HICOLOR_HEIGHT = 128
+CONST __GPU_MODE_TEXT_COLS = 64, __GPU_MODE_TEXT_ROWS = 32
+CONST __GPU_MODE_HIRES_WIDTH = 512, __GPU_MODE_HIRES_HEIGHT = 512
+CONST __GPU_MODE_COLOR_WIDTH = 256, __GPU_MODE_COLOR_HEIGHT = 256
+CONST __GPU_MODE_HICOLOR_WIDTH = 128, __GPU_MODE_HICOLOR_HEIGHT = 128
 
-    CONST __GPU_VRAMSIZE = &HFFFF&
+CONST __GPU_VRAMSIZE = &HFFFF&
 
-    DIM SHARED VRAM(__GPU_VRAMSIZE) AS _UNSIGNED _BYTE
-$END IF
+
+
+CONST __SND_REG_WAVEFORMS = __MAP_DEVICE_SND + &H0 '1 byte
+CONST __SND_REG_VOLS = __MAP_DEVICE_SND + &H1 '2 bytes
+CONST __SND_REG_DUTIES = __MAP_DEVICE_SND + &H3 '2 bytes
+CONST __SND_REG_NOTES = __MAP_DEVICE_SND + &H5 '8 bytes
+CONST __SND_REG_WRITE_ADDR = __MAP_DEVICE_SND + &HD '1 byte
+CONST __SND_REG_WRITE_BYTE = __MAP_DEVICE_SND + &HE '1 byte
+CONST __SND_REG_WRITE = __SND_REG_WRITE_BYTE '1 btye
+
+CONST __SND_SRAMSIZE = 127
+
 
 CONST __BANK_RAMBANKS = 10
 CONST __BANK_ROMBANKS = 1
@@ -111,6 +110,11 @@ DIM SHARED StaticROM(__MAP_STATICROM_BEGIN TO __MAP_STATICROM_END) AS _UNSIGNED 
 DIM SHARED BankedRAM(__MAP_BANK_BEGIN TO __MAP_BANK_END, __BANK_RAMBANKS) AS _UNSIGNED _BYTE
 DIM SHARED BankedROM(__MAP_BANK_BEGIN TO __MAP_BANK_END, __BANK_ROMBANKS) AS _UNSIGNED _BYTE
 DIM SHARED DeviceRAM(__MAP_DEVICEREGS_BEGIN TO __MAP_DEVICEREGS_END) AS _UNSIGNED _BYTE
+DIM SHARED VRAM(__GPU_VRAMSIZE) AS _UNSIGNED _BYTE
+DIM SHARED SndRAM(__SND_SRAMSIZE) AS _UNSIGNED _BYTE
+'DIM SHARED Waveforms(4, 100010100101010010010101001000)
+
+
 DIM SHARED GPUImage&, TextModeFont&
 DIM Pallete_Color(15) AS _UNSIGNED LONG
 DIM Pallete_HiColor(255) AS _UNSIGNED LONG
@@ -118,8 +122,8 @@ DIM Pallete_HiColor(255) AS _UNSIGNED LONG
 DIM SHARED CPU AS CPURegisters, GPU AS GPURegisters, Snd AS SoundRegisters
 
 Snd.BufferLen = _SNDRATE * (1 / 60)
-Snd.Ch1 = _SNDOPENRAW
-Snd.Ch2 = _SNDOPENRAW
+'Snd.Ch1 = _SNDOPENRAW
+'Snd.Ch2 = _SNDOPENRAW
 
 
 LoadROM "test.rom"
@@ -1026,19 +1030,19 @@ SUB Bus_DeviceActions (a~%)
 
 
 
-        CASE __GSU_GREG_WRITE
+        CASE __GPU_REG_WRITE
             SHARED VRAM() AS _UNSIGNED _BYTE
-            VRAM(B2I(DeviceRAM(__GSU_GREG_WRITE_ADDR), DeviceRAM(__GSU_GREG_WRITE_ADDR + 1))) = DeviceRAM(__GSU_GREG_WRITE_BYTE)
+            VRAM(B2I(DeviceRAM(__GPU_REG_WRITE_ADDR), DeviceRAM(__GPU_REG_WRITE_ADDR + 1))) = DeviceRAM(__GPU_REG_WRITE_BYTE)
 
             i~%% = DeviceRAM(__GSU_GREG_WRITE_ADDR) 'incrememnt it
-            DeviceRAM(__GSU_GREG_WRITE_ADDR + 1) = DeviceRAM(__GSU_GREG_WRITE_ADDR + 1) - (i~%% = 255)
-            DeviceRAM(__GSU_GREG_WRITE_ADDR) = i~%% + 1
+            DeviceRAM(__GPU_REG_WRITE_ADDR + 1) = DeviceRAM(__GPU_REG_WRITE_ADDR + 1) - (i~%% = 255)
+            DeviceRAM(__GPU_REG_WRITE_ADDR) = i~%% + 1
 
 
 
-        CASE __GSU_GREG_VMODE
+        CASE __GPU_REG_VMODE
             SHARED GPUImage&, GPU AS GPURegisters, TextModeFont&
-            tmp~%% = DeviceRAM(__GSU_GREG_VMODE)
+            tmp~%% = DeviceRAM(__GPU_REG_VMODE)
             IF tmp~%% = GPU.VMode THEN EXIT SUB
             SELECT CASE tmp~%%
 
@@ -1065,9 +1069,13 @@ SUB Bus_DeviceActions (a~%)
 
 
 
-        CASE __GSU_GREG_PAGEOFFSET
+        CASE __GPU_REG_PAGEOFFSET
             SHARED GPU AS GPURegisters
-            GPU.PageOffset = _SHL(DeviceRAM(__GSU_GREG_PAGEOFFSET), 8)
+            GPU.PageOffset = _SHL(DeviceRAM(__GPU_REG_PAGEOFFSET), 8)
+
+        CASE __SND_REG_WRITE
+            SHARED Snd AS SoundRegisters, SndRAM() AS _UNSIGNED _BYTE
+            sndram(deviceram(__snd_reg_write_addr) and &b01111111
     END SELECT
 END SUB
 
@@ -1110,181 +1118,248 @@ SUB LoadROM (f$)
     CLOSE f%
 END SUB
 
-$IF SOUND = WAVE THEN
-    SUB System_Sound
-        SHARED Snd AS SoundRegisters
+'SUB System_Sound       IGNORE THIS
+'    SHARED Snd AS SoundRegisters
 
-        TYPE Channel
-            VolReg AS _UNSIGNED _BYTE
-            Vol AS SINGLE
-            Freq AS _UNSIGNED INTEGER
-            Frac AS _UNSIGNED INTEGER
-            Play AS _BYTE
-        END TYPE
+'    TYPE Channel
+'        VolReg AS _UNSIGNED _BYTE
+'        Vol AS SINGLE
+'        Freq AS _UNSIGNED INTEGER
+'        Frac AS _UNSIGNED INTEGER
+'        Play AS _BYTE
+'    END TYPE
 
-        STATIC AS Channel Ch1, Ch2
-        STATIC AS SINGLE Waveform1(15), Waveform2(15) '16 samples
-        STATIC AS _UNSIGNED LONG Time
+'    STATIC AS Channel Ch1, Ch2
+'    STATIC AS SINGLE Waveform1(15), Waveform2(15) '16 samples
+'    STATIC AS _UNSIGNED LONG Time
 
-        Ch1.VolReg = DeviceRAM(__GSU_SREG_CH1_VOL)
-        Ch1.Freq = B2I(DeviceRAM(__GSU_SREG_CH1_PITCH), DeviceRAM(__GSU_SREG_CH1_PITCH + 1))
+'    Ch1.VolReg = DeviceRAM(__GSU_SREG_CH1_VOL)
+'    Ch1.Freq = B2I(DeviceRAM(__GSU_SREG_CH1_PITCH), DeviceRAM(__GSU_SREG_CH1_PITCH + 1))
 
-        Ch1.Play = (Ch1.VolReg <> 0) AND (Ch1.Freq <> 0)
-        IF Ch1.Play THEN
-            Ch1.Vol = Ch1.VolReg / 1024
-            Ch1.Frac = _SNDRATE / Ch1.Freq
-        ELSE Ch1.Frac = 1
+'    Ch1.Play = (Ch1.VolReg <> 0) AND (Ch1.Freq <> 0)
+'    IF Ch1.Play THEN
+'        Ch1.Vol = Ch1.VolReg / 1024
+'        Ch1.Frac = _SNDRATE / Ch1.Freq
+'    ELSE Ch1.Frac = 1
+'    END IF
+
+
+'    Ch2.VolReg = DeviceRAM(__GSU_SREG_CH2_VOL)
+'    Ch2.Freq = B2I(DeviceRAM(__GSU_SREG_CH2_PITCH), DeviceRAM(__GSU_SREG_CH2_PITCH + 1))
+
+'    Ch2.Play = (Ch2.VolReg <> 0) AND (Ch2.Freq <> 0)
+'    IF Ch2.Play THEN
+'        Ch2.Vol = Ch2.VolReg / 1024
+'        Ch2.Frac = _SNDRATE / Ch2.Freq
+'    ELSE Ch2.Frac = 1
+'    END IF
+
+'    'make the waveform
+'    IF (Ch1.Play OR Ch2.Play) THEN
+'        p~%% = 0
+'        i~%% = 0: DO
+'            IF Ch1.Play THEN
+'                b~%% = DeviceRAM(__GSU_SREG_CH1_WAVE + p~%%)
+'                Waveform1(i~%%) = _SHR(b~%% AND &B11000000, 6) * Ch1.Vol
+'                Waveform1(i~%% + 1) = _SHR(b~%% AND &B00110000, 4) * Ch1.Vol
+'                Waveform1(i~%% + 2) = _SHR(b~%% AND &B00001100, 2) * Ch1.Vol
+'                Waveform1(i~%% + 3) = (b~%% AND &B00000011) * Ch1.Vol
+'            END IF
+
+'            IF Ch2.Play THEN
+'                b~%% = DeviceRAM(__GSU_SREG_CH2_WAVE + p~%%)
+'                Waveform2(i~%%) = _SHR(b~%% AND &B11000000, 6) * Ch2.Vol
+'                Waveform2(i~%% + 1) = _SHR(b~%% AND &B00110000, 4) * Ch2.Vol
+'                Waveform2(i~%% + 2) = _SHR(b~%% AND &B00001100, 2) * Ch2.Vol
+'                Waveform2(i~%% + 3) = (b~%% AND &B00000011) * Ch2.Vol
+'            END IF
+'            p~%% = p~%% + 1
+'        i~%% = i~%% + 4: LOOP UNTIL i~%% = 16
+
+'        'play it here
+'        DO
+'            IF Ch1.Play THEN _SNDRAW Waveform1((Time MOD Ch1.Frac) AND &HF), , Snd.Ch1 ELSE _SNDRAW 0, , Snd.Ch1
+'            IF Ch2.Play THEN _SNDRAW Waveform2((Time MOD Ch2.Frac) AND &HF), , Snd.Ch2 ELSE _SNDRAW 0, , Snd.Ch2
+'        Time = Time + 1: LOOP UNTIL _SNDRAWLEN > 0.1
+
+'    ELSE
+'        DO: _SNDRAW 0: LOOP UNTIL _SNDRAWLEN > 0.1
+'    END IF
+'END SUB
+
+
+
+SUB System_Sound
+
+    TYPE Channel
+        Wave AS _UNSIGNED _BYTE
+        Freq AS _UNSIGNED INTEGER
+        Frac AS _UNSIGNED INTEGER
+        Duty AS _UNSIGNED _BYTE
+        Vol AS _UNSIGNED _BYTE
+    END TYPE
+
+    STATIC Ch(3) AS Channel
+    STATIC Wave(3) AS SINGLE
+
+
+
+
+    'Waveform byte (numbers represent channels): 00112233
+    Ch(0).Wave = _SHR(DeviceRAM(__SND_REG_WAVEFORMS) AND &B11000000, 6)
+    Ch(1).Wave = _SHR(DeviceRAM(__SND_REG_WAVEFORMS) AND &B00110000, 4)
+    Ch(2).Wave = _SHR(DeviceRAM(__SND_REG_WAVEFORMS) AND &B00001100, 2)
+    Ch(3).Wave = DeviceRAM(__SND_REG_WAVEFORMS) AND &B00000011
+
+    'vol bytes (numbers represent channels): 00001111 22223333
+    Ch(0).Vol = _SHR(DeviceRAM(__SND_REG_VOLS) AND &B11110000, 4)
+    Ch(1).Vol = DeviceRAM(__SND_REG_VOLS) AND &B00001111
+    Ch(2).Vol = _SHR(DeviceRAM(__SND_REG_VOLS + 1) AND &B11110000, 4)
+    Ch(3).Vol = DeviceRAM(__SND_REG_VOLS + 1) AND &B00001111
+
+    'duty bytes (numbers represent channels): 00001111 22223333
+    Ch(0).Duty = _SHR(DeviceRAM(__SND_REG_DUTIES) AND &B11110000, 4)
+    Ch(1).Duty = DeviceRAM(__SND_REG_DUTIES) AND &B00001111
+    Ch(2).Duty = _SHR(DeviceRAM(__SND_REG_DUTIES + 1) AND &B11110000, 4)
+    Ch(3).Duty = DeviceRAM(__SND_REG_DUTIES + 1) AND &B00001111
+
+
+
+    ch~%% = 0: DO
+        i~%% = _SHL(ch~%%, 1) 'fastest way to do *2
+        note~%% = DeviceRAM(__SND_REG_NOTES + i~%%)
+        shift%% = DeviceRAM(__SND_REG_NOTES + i~%% + 1)
+
+
+
+
+        REM f(n) = 2^((n-29)/12) * 440 'where n is semitones and f is frequency
+        REM N = note + (s / 127)       'where N is final semitones, n is semitones in reg, and s is shift
+        'therefore:
+        REM f(n,s) = 2^(((n+(s/127))/12) * 440  'where f is frequency, n is semitones in reg, and s is shift
+        '
+        Ch(ch~%%).Freq = (2 ^ (((note~%% + (shift%% / 127)) - 49) / 12)) * 440
+        Ch(ch~%%).Frac = _SNDRATE / Ch(ch~%%).Freq
+
+
+
+
+    ch~%% = ch~%% + 1: LOOP UNTIL ch~%% = 3
+END SUB
+
+
+
+
+
+
+
+SUB System_GPU
+    'System_Sound
+    'System_Sound
+    SHARED GPUImage&, TextModeFont&, GPU AS GPURegisters
+    SHARED VRAM() AS _UNSIGNED _BYTE
+
+    SHARED Pallete_Color() AS _UNSIGNED LONG
+    SHARED Pallete_HiColor() AS _UNSIGNED LONG
+
+    STATIC w AS _UNSIGNED INTEGER, h AS _UNSIGNED INTEGER
+    STATIC fw AS _UNSIGNED _BYTE, fh AS _UNSIGNED _BYTE
+
+    i~% = GPU.PageOffset
+
+    'emulate
+    _DEST GPUImage&
+    CLS
+    SELECT CASE GPU.VMode 'draw the screen
+        CASE __GPU_MODE_TEXT
+            w = _WIDTH
+            h = _HEIGHT
+            fw = _FONTWIDTH
+            fh = _FONTHEIGHT
+            y~% = 0: DO 'according to ChiaPet#1361 (ID 404676474126336011 for archival purposes) on QB64 Discord, using this instead of FOR is faster
+                x~% = 0: DO
+                    _PRINTSTRING (x~%, y~%), CHR$(VRAM(i~%))
+
+                    i~% = i~% + 1
+                x~% = x~% + fw: LOOP UNTIL x~% = w
+            y~% = y~% + fh: LOOP UNTIL y~% = h
+
+
+        CASE __GPU_MODE_HIRES
+            y~% = 0: DO
+                x~% = 0: DO
+
+                    b~%% = VRAM(i~%) 'fastest way to do this ig
+                    IF b~%% AND &B00000001 THEN PSET (x~%, y~%)
+                    IF b~%% AND &B00000010 THEN PSET (x~% + 1, y~%)
+                    IF b~%% AND &B00000100 THEN PSET (x~% + 2, y~%)
+                    IF b~%% AND &B00001000 THEN PSET (x~% + 3, y~%)
+                    IF b~%% AND &B00010000 THEN PSET (x~% + 4, y~%)
+                    IF b~%% AND &B00100000 THEN PSET (x~% + 5, y~%)
+                    IF b~%% AND &B01000000 THEN PSET (x~% + 6, y~%)
+                    IF b~%% AND &B10000000 THEN PSET (x~% + 7, y~%)
+                    i~% = i~% + 1
+
+                x~% = x~% + 8: LOOP UNTIL x~% = __GPU_MODE_HIRES_WIDTH
+            y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_HIRES_HEIGHT
+
+
+        CASE __GPU_MODE_COLOR
+            y~% = 0: DO
+                x~% = 0: DO
+
+                    b~%% = VRAM(i~%)
+                    PSET (x~%, y~%), Pallete_Color(b~%% AND &H0F)
+                    PSET (x~% + 1, y~%), Pallete_Color(_SHR(b~%% AND &HF0, 4))
+
+                    i~% = i~% + 1
+
+                x~% = x~% + 2: LOOP UNTIL x~% = __GPU_MODE_COLOR_WIDTH
+            y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_COLOR_HEIGHT
+
+
+        CASE __GPU_MODE_HICOLOR
+            y~% = 0: DO
+                x~% = 0: DO
+                    PSET (x~%, y~%), Pallete_HiColor(VRAM(i~%))
+                    i~% = i~% + 1
+                x~% = x~% + 1: LOOP UNTIL x~% = __GPU_MODE_HICOLOR_WIDTH
+            y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_HICOLOR_HEIGHT
+
+    END SELECT
+END SUB
+
+SUB System_GPU_GeneratePalletes
+    SHARED Pallete_Color() AS _UNSIGNED LONG
+    SHARED Pallete_HiColor() AS _UNSIGNED LONG
+
+    'Color pallete
+    FOR i~%% = 0 TO 15
+        IF i~%% AND &B0001 THEN R~%% = 255
+        IF i~%% AND &B0010 THEN G~%% = 255
+        IF i~%% AND &B0100 THEN B~%% = 255
+        IF (i~%% AND &B1000) = 0 THEN
+            R~%% = R~%% / 2
+            G~%% = G~%% / 2
+            B~%% = B~%% / 2
         END IF
+        Pallete_Color(i~%%) = _RGB32(R~%%, G~%%, B~%%)
+    NEXT
+
+    'HiColor pallete
+    FOR i~%% = 0 TO 255
+        A~%% = _SHR(i~%% AND &B11000000, 2)
+        R~%% = _SHL(i~%% AND &B00000011, 6) OR A~%%
+        G~%% = _SHL(i~%% AND &B00001100, 4) OR A~%%
+        B~%% = _SHL(i~%% AND &B00110000, 2) OR A~%%
+        Pallete_HiColor(i~%%) = _RGB32(R~%%, G~%%, B~%%)
+    NEXT
+END SUB
 
 
-        Ch2.VolReg = DeviceRAM(__GSU_SREG_CH2_VOL)
-        Ch2.Freq = B2I(DeviceRAM(__GSU_SREG_CH2_PITCH), DeviceRAM(__GSU_SREG_CH2_PITCH + 1))
+SUB System_Sound_GenerateWaveforms
 
-        Ch2.Play = (Ch2.VolReg <> 0) AND (Ch2.Freq <> 0)
-        IF Ch2.Play THEN
-            Ch2.Vol = Ch2.VolReg / 1024
-            Ch2.Frac = _SNDRATE / Ch2.Freq
-        ELSE Ch2.Frac = 1
-        END IF
-
-        'make the waveform
-        IF (Ch1.Play OR Ch2.Play) THEN
-            p~%% = 0
-            i~%% = 0: DO
-                IF Ch1.Play THEN
-                    b~%% = DeviceRAM(__GSU_SREG_CH1_WAVE + p~%%)
-                    Waveform1(i~%%) = _SHR(b~%% AND &B11000000, 6) * Ch1.Vol
-                    Waveform1(i~%% + 1) = _SHR(b~%% AND &B00110000, 4) * Ch1.Vol
-                    Waveform1(i~%% + 2) = _SHR(b~%% AND &B00001100, 2) * Ch1.Vol
-                    Waveform1(i~%% + 3) = (b~%% AND &B00000011) * Ch1.Vol
-                END IF
-
-                IF Ch2.Play THEN
-                    b~%% = DeviceRAM(__GSU_SREG_CH2_WAVE + p~%%)
-                    Waveform2(i~%%) = _SHR(b~%% AND &B11000000, 6) * Ch2.Vol
-                    Waveform2(i~%% + 1) = _SHR(b~%% AND &B00110000, 4) * Ch2.Vol
-                    Waveform2(i~%% + 2) = _SHR(b~%% AND &B00001100, 2) * Ch2.Vol
-                    Waveform2(i~%% + 3) = (b~%% AND &B00000011) * Ch2.Vol
-                END IF
-                p~%% = p~%% + 1
-            i~%% = i~%% + 4: LOOP UNTIL i~%% = 16
-
-            'play it here
-            DO
-                IF Ch1.Play THEN _SNDRAW Waveform1((Time MOD Ch1.Frac) AND &HF), , Snd.Ch1 ELSE _SNDRAW 0, , Snd.Ch1
-                IF Ch2.Play THEN _SNDRAW Waveform2((Time MOD Ch2.Frac) AND &HF), , Snd.Ch2 ELSE _SNDRAW 0, , Snd.Ch2
-            Time = Time + 1: LOOP UNTIL _SNDRAWLEN > 0.1
-
-        ELSE
-            DO: _SNDRAW 0: LOOP UNTIL _SNDRAWLEN > 0.1
-        END IF
-    END SUB
-$END IF
-
-$IF GPU = BITMAP THEN
-    SUB System_GPU
-        System_Sound
-        System_Sound
-        SHARED GPUImage&, TextModeFont&, GPU AS GPURegisters
-        SHARED VRAM() AS _UNSIGNED _BYTE
-
-        SHARED Pallete_Color() AS _UNSIGNED LONG
-        SHARED Pallete_HiColor() AS _UNSIGNED LONG
-
-        STATIC w AS _UNSIGNED INTEGER, h AS _UNSIGNED INTEGER
-        STATIC fw AS _UNSIGNED _BYTE, fh AS _UNSIGNED _BYTE
-
-        i~% = GPU.PageOffset
-
-        'emulate
-        _DEST GPUImage&
-        CLS
-        SELECT CASE GPU.VMode 'draw the screen
-            CASE __GPU_MODE_TEXT
-                w = _WIDTH
-                h = _HEIGHT
-                fw = _FONTWIDTH
-                fh = _FONTHEIGHT
-                y~% = 0: DO 'according to ChiaPet#1361 (ID 404676474126336011 for archival purposes) on QB64 Discord, using this instead of FOR is faster
-                    x~% = 0: DO
-                        _PRINTSTRING (x~%, y~%), CHR$(VRAM(i~%))
-
-                        i~% = i~% + 1
-                    x~% = x~% + fw: LOOP UNTIL x~% = w
-                y~% = y~% + fh: LOOP UNTIL y~% = h
-
-
-            CASE __GPU_MODE_HIRES
-                y~% = 0: DO
-                    x~% = 0: DO
-
-                        b~%% = VRAM(i~%) 'fastest way to do this ig
-                        IF b~%% AND &B00000001 THEN PSET (x~%, y~%)
-                        IF b~%% AND &B00000010 THEN PSET (x~% + 1, y~%)
-                        IF b~%% AND &B00000100 THEN PSET (x~% + 2, y~%)
-                        IF b~%% AND &B00001000 THEN PSET (x~% + 3, y~%)
-                        IF b~%% AND &B00010000 THEN PSET (x~% + 4, y~%)
-                        IF b~%% AND &B00100000 THEN PSET (x~% + 5, y~%)
-                        IF b~%% AND &B01000000 THEN PSET (x~% + 6, y~%)
-                        IF b~%% AND &B10000000 THEN PSET (x~% + 7, y~%)
-                        i~% = i~% + 1
-
-                    x~% = x~% + 8: LOOP UNTIL x~% = __GPU_MODE_HIRES_WIDTH
-                y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_HIRES_HEIGHT
-
-
-            CASE __GPU_MODE_COLOR
-                y~% = 0: DO
-                    x~% = 0: DO
-
-                        b~%% = VRAM(i~%)
-                        PSET (x~%, y~%), Pallete_Color(b~%% AND &H0F)
-                        PSET (x~% + 1, y~%), Pallete_Color(_SHR(b~%% AND &HF0, 4))
-
-                        i~% = i~% + 1
-
-                    x~% = x~% + 2: LOOP UNTIL x~% = __GPU_MODE_COLOR_WIDTH
-                y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_COLOR_HEIGHT
-
-
-            CASE __GPU_MODE_HICOLOR
-                y~% = 0: DO
-                    x~% = 0: DO
-                        PSET (x~%, y~%), Pallete_HiColor(VRAM(i~%))
-                        i~% = i~% + 1
-                    x~% = x~% + 1: LOOP UNTIL x~% = __GPU_MODE_HICOLOR_WIDTH
-                y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_HICOLOR_HEIGHT
-
-        END SELECT
-    END SUB
-
-    SUB System_GPU_GeneratePalletes
-        SHARED Pallete_Color() AS _UNSIGNED LONG
-        SHARED Pallete_HiColor() AS _UNSIGNED LONG
-
-        'Color pallete
-        FOR i~%% = 0 TO 15
-            IF i~%% AND &B0001 THEN R~%% = 255
-            IF i~%% AND &B0010 THEN G~%% = 255
-            IF i~%% AND &B0100 THEN B~%% = 255
-            IF (i~%% AND &B1000) = 0 THEN
-                R~%% = R~%% / 2
-                G~%% = G~%% / 2
-                B~%% = B~%% / 2
-            END IF
-            Pallete_Color(i~%%) = _RGB32(R~%%, G~%%, B~%%)
-        NEXT
-
-        'HiColor pallete
-        FOR i~%% = 0 TO 255
-            A~%% = _SHR(i~%% AND &B11000000, 2)
-            R~%% = _SHL(i~%% AND &B00000011, 6) OR A~%%
-            G~%% = _SHL(i~%% AND &B00001100, 4) OR A~%%
-            B~%% = _SHL(i~%% AND &B00110000, 2) OR A~%%
-            Pallete_HiColor(i~%%) = _RGB32(R~%%, G~%%, B~%%)
-        NEXT
-    END SUB
-$END IF
+END SUB
 
 
 FUNCTION fps!
