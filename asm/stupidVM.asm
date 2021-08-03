@@ -257,8 +257,8 @@ DEVICE_SND	=	(DEVICEREGS_BEGIN + 0x20)	; 16 bytes
 
 GPU_WRITEBYTE	=	(DEVICE_GPU + 0x0)	; 1 byte
 GPU_WRITEADDR	=	(DEVICE_GPU + 0x1)	; 2 bytes
-GPU_OFFSET	=	(DEVICE_GPU + 0x2)	; 1 byte
-GPU_VMODE	=	(DEVICE_GPU + 0x3)	; 1 byte
+GPU_OFFSET	=	(DEVICE_GPU + 0x3)	; 1 byte
+GPU_VMODE	=	(DEVICE_GPU + 0x4)	; 1 byte
 
 SND_WAVE	=	(DEVICE_SND + 0x0)	; 1 byte
 SND_VOL		=	(DEVICE_SND + 0x1)	; 2 bytes
@@ -277,6 +277,10 @@ SND_WRITE	=	SND_WRITEBYTE
 
 BANKNO		=	(DEVICE_SYS + 0x0)	; 1 byte
 TIMER		=	(DEVICE_SYS + 0x4)	; 1 byte
+
+IO_MOUSE	=	(DEVICE_SYS + 0x1)	; 1 bte
+IO_KEYBOARD	=	(DEVICE_SYS + 0x2)	; 2 bytes
+
 
 VMODE_TEXT	=	0
 VMODE_HIRES	=	1

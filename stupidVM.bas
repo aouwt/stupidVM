@@ -134,7 +134,7 @@ _ECHO "done"
 
 TextModeFont& = 8
 GPUImage& = _NEWIMAGE(8, 8, 32)
-Bus_DeviceActions __GSU_REG_VMODE
+Bus_DeviceActions __GPU_REG_VMODE
 
 
 SCREEN _NEWIMAGE(640, 480, 32)
@@ -1007,19 +1007,23 @@ SUB Bus_DeviceActions (a~%)
 
 
         CASE __SYS_IO_MOUSE
-            STATIC mousedata~%%
+            STATIC mousedata~%%, mousex~%, mousey~%%
             'ok so this is a little confusing
             IF _MOUSEINPUT THEN
-tmp%% = SGN(_MOUSEMOVEMENTX):                      mousedata~%% = (tmp%% = -1          )    _
-AND _SHL(tmp%% = 1           , 1)
-tmp%% = SGN(_MOUSEMOVEMENTY): mousedata~%% = mousedata~%% AND _SHL(tmp%% = -1          , 2) _
-AND _SHL(tmp%% = 1           , 3) _
-AND _SHL(_MOUSEWHEEL = -1    , 4) _
-AND _SHL(_MOUSEWHEEL = 1     , 5) _
-AND _SHL(_MOUSEBUTTON(1) = -1, 6) _
-AND _SHL(_MOUSEBUTTON(2) = -1, 7)
+
+                mousedata~%% =                      (_MOUSEX < mousex~%     )    _
+                                            AND _SHL(_MOUSEX > mousex~%  , 1)
+                mousedata~%% = mousedata~%% AND _SHL(_MOUSEY < mousey~%  , 2) _
+                                            AND _SHL(_MOUSEY > mousey~%  , 3) _
+                                            AND _SHL(_MOUSEWHEEL = -1    , 4) _
+                                            AND _SHL(_MOUSEWHEEL = 1     , 5) _
+                                            AND _SHL(_MOUSEBUTTON(1) = -1, 6) _
+                                            AND _SHL(_MOUSEBUTTON(2) = -1, 7)
             END IF
             DeviceRAM(__SYS_IO_MOUSE) = mousedata~%%
+            mousex~% = mousex~% - SGN(mousex~% - _MOUSEX)
+                mousey~% = mousey~% - SGN(mousex~% - _MOUSEY)
+
 
 
         CASE __SYS_IO_KEYBOARD
@@ -1210,7 +1214,7 @@ END SUB
 
 
 SUB System_GPU
-    System_Sound
+    'System_Sound
     'System_Sound
     SHARED GPUImage&, TextModeFont&, GPU AS GPURegisters
     SHARED VRAM() AS _UNSIGNED _BYTE
