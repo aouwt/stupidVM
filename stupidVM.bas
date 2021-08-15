@@ -1,5 +1,5 @@
 '$DEBUG
-$RESIZE:STRETCH
+$RESIZE:ON
 $CONSOLE
 CONST True = -1, False = 0
 
@@ -74,16 +74,33 @@ CONST __GPU_REG_PAGEOFFSET = __MAP_DEVICE_GPU + &H3 '1 byte
 CONST __GPU_REG_VMODE = __MAP_DEVICE_GPU + &H4 '1 byte
 CONST __GPU_REG_WRITE = __GPU_REG_WRITE_BYTE
 
+'video modes
+CONST __GPU_MODE_TEXT_1 = 0
+CONST __GPU_MODE_TEXT_1_COLS = 64, __GPU_MODE_TEXT_1_ROWS = 64
 
-CONST __GPU_MODE_TEXT = 0
-CONST __GPU_MODE_HIRES = 1
-CONST __GPU_MODE_COLOR = 2
-CONST __GPU_MODE_HICOLOR = 3
+CONST __GPU_MODE_TEXT_2 = 1
+CONST __GPU_MODE_TEXT_2_COLS = 128, __GPU_MODE_TEXT_2_ROWS = 128
 
-CONST __GPU_MODE_TEXT_COLS = 64, __GPU_MODE_TEXT_ROWS = 32
-CONST __GPU_MODE_HIRES_WIDTH = 512, __GPU_MODE_HIRES_HEIGHT = 512
-CONST __GPU_MODE_COLOR_WIDTH = 256, __GPU_MODE_COLOR_HEIGHT = 256
-CONST __GPU_MODE_HICOLOR_WIDTH = 128, __GPU_MODE_HICOLOR_HEIGHT = 128
+CONST __GPU_MODE_HIRES_1 = 2
+CONST __GPU_MODE_HIRES_1_WIDTH = 512, __GPU_MODE_HIRES_1_HEIGHT = 256
+
+CONST __GPU_MODE_HIRES_2 = 3
+CONST __GPU_MODE_HIRES_2_WIDTH = 512, __GPU_MODE_HIRES_2_HEIGHT = 512
+
+CONST __GPU_MODE_COLOR_1 = 4
+CONST __GPU_MODE_COLOR_1_WIDTH = 256, __GPU_MODE_COLOR_1_HEIGHT = 128
+
+CONST __GPU_MODE_COLOR_2 = 5
+CONST __GPU_MODE_COLOR_2_WIDTH = 256, __GPU_MODE_COLOR_2_HEIGHT = 256
+
+CONST __GPU_MODE_HICOLOR_1 = 6
+CONST __GPU_MODE_HICOLOR_1_WIDTH = 256, __GPU_MODE_HICOLOR_1_HEIGHT = 128
+
+CONST __GPU_MODE_HICOLOR_2 = 7
+CONST __GPU_MODE_HICOLOR_2_WIDTH = 256, __GPU_MODE_HICOLOR_2_HEIGHT = 256
+
+
+
 
 CONST __GPU_VRAMSIZE = &HFFFF&
 
@@ -115,8 +132,8 @@ DIM SHARED VRAM(__GPU_VRAMSIZE) AS _UNSIGNED _BYTE
 
 
 DIM SHARED GPUImage&, TextModeFont&
-DIM Pallete_Color(15) AS _UNSIGNED LONG
-DIM Pallete_HiColor(255) AS _UNSIGNED LONG
+DIM Pallete_4BPP(15) AS _UNSIGNED LONG
+DIM Pallete_8BPP(255) AS _UNSIGNED LONG
 
 DIM SHARED Waveforms(3, 255) AS SINGLE
 
@@ -132,17 +149,27 @@ System_GPU_GeneratePalletes
 System_Sound_GenWaveforms
 _ECHO "done"
 
-TextModeFont& = 8
+TextModeFont& = _LOADFONT("/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf", 18, "MONOSPACE,DONTBLEND")
 GPUImage& = _NEWIMAGE(8, 8, 32)
 Bus_DeviceActions __GPU_REG_VMODE
 
-
-SCREEN _NEWIMAGE(640, 480, 32)
+screenimage& = _NEWIMAGE(640, 480, 32)
+SCREEN screenimage&
 DO
     System_CPU
     t! = TIMER(0.0001)
     IF NextUpdate! < t! THEN
         System_GPU
+
+        IF _RESIZE THEN
+            tmp& = _COPYIMAGE(screenimage&, 32)
+            SCREEN tmp&
+            _FREEIMAGE screenimage&
+            screenimage& = _NEWIMAGE(_RESIZEWIDTH, _RESIZEHEIGHT, 32)
+            SCREEN screenimage&
+            _FREEIMAGE tmp&
+        END IF
+
         _PUTIMAGE , GPUImage&, 0
         _DISPLAY
         NextUpdate! = t! + UPDATEINTERVAL
@@ -158,6 +185,7 @@ SUB System_CPU
 
     '_ECHO HEX$(CPU.PC)
     'SLEEP
+    '_LIMIT 200
     GOSUB Addr_Imm
     op1~%% = B AND &HF0
     op2~%% = B AND &H0F
@@ -1007,22 +1035,24 @@ SUB Bus_DeviceActions (a~%)
 
 
         CASE __SYS_IO_MOUSE
-            STATIC mousedata~%%, mousex~%, mousey~%%
+            STATIC mousedata~%%, mousex~%, mouse~%
             'ok so this is a little confusing
+            'DeviceRAM(__SYS_IO_MOUSE) = 255
             IF _MOUSEINPUT THEN
+                WHILE _MOUSEINPUT: WEND
 
-                mousedata~%% =                      (_MOUSEX < mousex~%     )    _
-                                            AND _SHL(_MOUSEX > mousex~%  , 1)
-                mousedata~%% = mousedata~%% AND _SHL(_MOUSEY < mousey~%  , 2) _
-                                            AND _SHL(_MOUSEY > mousey~%  , 3) _
+                mousedata~%% =                      (_MOUSEX > mousex~%     )    _
+                                            AND _SHL(_MOUSEX < mousex~%  , 1)
+                mousedata~%% = mousedata~%% AND _SHL(_MOUSEY > mousey~%  , 2) _
+                                            AND _SHL(_MOUSEY < mousey~%  , 3) _
                                             AND _SHL(_MOUSEWHEEL = -1    , 4) _
                                             AND _SHL(_MOUSEWHEEL = 1     , 5) _
                                             AND _SHL(_MOUSEBUTTON(1) = -1, 6) _
                                             AND _SHL(_MOUSEBUTTON(2) = -1, 7)
             END IF
             DeviceRAM(__SYS_IO_MOUSE) = mousedata~%%
-            mousex~% = mousex~% - SGN(mousex~% - _MOUSEX)
-                mousey~% = mousey~% - SGN(mousex~% - _MOUSEY)
+            mousex~% = mousex~% + SGN(mousex~% - _MOUSEX)
+            mousey~% = mousey~% + SGN(mousex~% - _MOUSEY)
 
 
 
@@ -1051,22 +1081,35 @@ SUB Bus_DeviceActions (a~%)
             IF tmp~%% = GPU.VMode THEN EXIT SUB
             SELECT CASE tmp~%%
 
-                CASE __GPU_MODE_TEXT
+                CASE __GPU_MODE_TEXT_1
                     _FREEIMAGE GPUImage&
-                    GPUImage& = _NEWIMAGE(__GPU_MODE_TEXT_COLS * _FONTWIDTH(TextModeFont&), __GPU_MODE_TEXT_ROWS * _FONTHEIGHT(TextModeFont&), 32)
+                    GPUImage& = _NEWIMAGE(__GPU_MODE_TEXT_1_COLS * _FONTWIDTH(TextModeFont&), __GPU_MODE_TEXT_1_ROWS * _FONTHEIGHT(TextModeFont&), 32)
+                    _FONT TextModeFont&, GPUImage&
+                CASE __GPU_MODE_TEXT_2
+                    _FREEIMAGE GPUImage&
+                    GPUImage& = _NEWIMAGE(__GPU_MODE_TEXT_2_COLS * _FONTWIDTH(TextModeFont&), __GPU_MODE_TEXT_2_ROWS * _FONTHEIGHT(TextModeFont&), 32)
                     _FONT TextModeFont&, GPUImage&
 
-                CASE __GPU_MODE_HIRES
+                CASE __GPU_MODE_HIRES_1
                     _FREEIMAGE GPUImage&
-                    GPUImage& = _NEWIMAGE(__GPU_MODE_HIRES_WIDTH, __GPU_MODE_HIRES_HEIGHT, 32)
+                    GPUImage& = _NEWIMAGE(__GPU_MODE_HIRES_1_WIDTH, __GPU_MODE_HIRES_1_HEIGHT, 32)
+                CASE __GPU_MODE_HIRES_2
+                    _FREEIMAGE GPUImage&
+                    GPUImage& = _NEWIMAGE(__GPU_MODE_HIRES_2_WIDTH, __GPU_MODE_HIRES_2_HEIGHT, 32)
 
-                CASE __GPU_MODE_COLOR
+                CASE __GPU_MODE_COLOR_1
                     _FREEIMAGE GPUImage&
-                    GPUImage& = _NEWIMAGE(__GPU_MODE_COLOR_WIDTH, __GPU_MODE_COLOR_HEIGHT, 32)
+                    GPUImage& = _NEWIMAGE(__GPU_MODE_COLOR_1_WIDTH, __GPU_MODE_COLOR_1_HEIGHT, 32)
+                CASE __GPU_MODE_COLOR_2
+                    _FREEIMAGE GPUImage&
+                    GPUImage& = _NEWIMAGE(__GPU_MODE_COLOR_2_WIDTH, __GPU_MODE_COLOR_2_HEIGHT, 32)
 
-                CASE __GPU_MODE_HICOLOR
+                CASE __GPU_MODE_HICOLOR_1
                     _FREEIMAGE GPUImage&
-                    GPUImage& = _NEWIMAGE(__GPU_MODE_HICOLOR_WIDTH, __GPU_MODE_HICOLOR_HEIGHT, 32)
+                    GPUImage& = _NEWIMAGE(__GPU_MODE_HICOLOR_1_WIDTH, __GPU_MODE_HICOLOR_1_HEIGHT, 32)
+                CASE __GPU_MODE_HICOLOR_2
+                    _FREEIMAGE GPUImage&
+                    GPUImage& = _NEWIMAGE(__GPU_MODE_HICOLOR_2_WIDTH, __GPU_MODE_HICOLOR_2_HEIGHT, 32)
 
                 CASE ELSE: _ECHO "ERROR: Invalid video mode!": EXIT SUB
             END SELECT
@@ -1080,7 +1123,12 @@ SUB Bus_DeviceActions (a~%)
 
         CASE __SND_REG_WRITE
             SHARED Waveforms() AS SINGLE
-            Waveforms(3, DeviceRAM(__SND_REG_WRITE_ADDR)) = DeviceRAM(__SND_REG_WRITE_BYTE) / 255
+            tmp~%% = DeviceRAM(__SND_REG_WRITE_ADDR) * 4
+            tmp! = DeviceRAM(__SND_REG_WRITE_BYTE) / 255
+            Waveforms(3, tmp~%%) = tmp!
+            Waveforms(3, tmp~%% + 1) = tmp!
+            Waveforms(3, tmp~%% + 2) = tmp!
+            Waveforms(3, tmp~%% + 3) = tmp!
 
     END SELECT
 END SUB
@@ -1215,12 +1263,12 @@ END SUB
 
 SUB System_GPU
     'System_Sound
-    'System_Sound
+    System_Sound
     SHARED GPUImage&, TextModeFont&, GPU AS GPURegisters
     SHARED VRAM() AS _UNSIGNED _BYTE
 
-    SHARED Pallete_Color() AS _UNSIGNED LONG
-    SHARED Pallete_HiColor() AS _UNSIGNED LONG
+    SHARED Pallete_4BPP() AS _UNSIGNED LONG
+    SHARED Pallete_8BPP() AS _UNSIGNED LONG
 
     STATIC w AS _UNSIGNED INTEGER, h AS _UNSIGNED INTEGER
     STATIC fw AS _UNSIGNED _BYTE, fh AS _UNSIGNED _BYTE
@@ -1231,13 +1279,15 @@ SUB System_GPU
     _DEST GPUImage&
     CLS
     SELECT CASE GPU.VMode 'draw the screen
-        CASE __GPU_MODE_TEXT
+        CASE __GPU_MODE_TEXT_1, __GPU_MODE_TEXT_2
             w = _WIDTH
             h = _HEIGHT
             fw = _FONTWIDTH
             fh = _FONTHEIGHT
             y~% = 0: DO 'according to ChiaPet#1361 (ID 404676474126336011 for archival purposes) on QB64 Discord, using this instead of FOR is faster
                 x~% = 0: DO
+                    tmp~%% = VRAM(i~% + 32768)
+                    COLOR Pallete_4BPP((NOT tmp~%%) AND &H0F), Pallete_4BPP(_SHR(tmp~%% AND &HF0, 4))
                     _PRINTSTRING (x~%, y~%), CHR$(VRAM(i~%))
 
                     i~% = i~% + 1
@@ -1245,7 +1295,8 @@ SUB System_GPU
             y~% = y~% + fh: LOOP UNTIL y~% = h
 
 
-        CASE __GPU_MODE_HIRES
+
+        CASE __GPU_MODE_HIRES_1
             y~% = 0: DO
                 x~% = 0: DO
 
@@ -1260,38 +1311,79 @@ SUB System_GPU
                     IF b~%% AND &B10000000 THEN PSET (x~% + 7, y~%)
                     i~% = i~% + 1
 
-                x~% = x~% + 8: LOOP UNTIL x~% = __GPU_MODE_HIRES_WIDTH
-            y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_HIRES_HEIGHT
+                x~% = x~% + 8: LOOP UNTIL x~% = __GPU_MODE_HIRES_1_WIDTH
+            y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_HIRES_1_HEIGHT
+
+        CASE __GPU_MODE_HIRES_2
+            y~% = 0: DO
+                x~% = 0: DO
+
+                    b~%% = VRAM(i~%) 'fastest way to do this ig
+                    IF b~%% AND &B00000001 THEN PSET (x~%, y~%)
+                    IF b~%% AND &B00000010 THEN PSET (x~% + 1, y~%)
+                    IF b~%% AND &B00000100 THEN PSET (x~% + 2, y~%)
+                    IF b~%% AND &B00001000 THEN PSET (x~% + 3, y~%)
+                    IF b~%% AND &B00010000 THEN PSET (x~% + 4, y~%)
+                    IF b~%% AND &B00100000 THEN PSET (x~% + 5, y~%)
+                    IF b~%% AND &B01000000 THEN PSET (x~% + 6, y~%)
+                    IF b~%% AND &B10000000 THEN PSET (x~% + 7, y~%)
+                    i~% = i~% + 1
+
+                x~% = x~% + 8: LOOP UNTIL x~% = __GPU_MODE_HIRES_2_WIDTH
+            y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_HIRES_2_HEIGHT
 
 
-        CASE __GPU_MODE_COLOR
+
+        CASE __GPU_MODE_COLOR_1
             y~% = 0: DO
                 x~% = 0: DO
 
                     b~%% = VRAM(i~%)
-                    PSET (x~%, y~%), Pallete_Color(b~%% AND &H0F)
-                    PSET (x~% + 1, y~%), Pallete_Color(_SHR(b~%% AND &HF0, 4))
+                    PSET (x~%, y~%), Pallete_4BPP(b~%% AND &H0F)
+                    PSET (x~% + 1, y~%), Pallete_4BPP(_SHR(b~%% AND &HF0, 4))
 
                     i~% = i~% + 1
 
-                x~% = x~% + 2: LOOP UNTIL x~% = __GPU_MODE_COLOR_WIDTH
-            y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_COLOR_HEIGHT
+                x~% = x~% + 2: LOOP UNTIL x~% = __GPU_MODE_COLOR_1_WIDTH
+            y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_COLOR_1_HEIGHT
 
-
-        CASE __GPU_MODE_HICOLOR
+        CASE __GPU_MODE_COLOR_2
             y~% = 0: DO
                 x~% = 0: DO
-                    PSET (x~%, y~%), Pallete_HiColor(VRAM(i~%))
+
+                    b~%% = VRAM(i~%)
+                    PSET (x~%, y~%), Pallete_4BPP(b~%% AND &H0F)
+                    PSET (x~% + 1, y~%), Pallete_4BPP(_SHR(b~%% AND &HF0, 4))
+
                     i~% = i~% + 1
-                x~% = x~% + 1: LOOP UNTIL x~% = __GPU_MODE_HICOLOR_WIDTH
-            y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_HICOLOR_HEIGHT
+
+                x~% = x~% + 2: LOOP UNTIL x~% = __GPU_MODE_COLOR_2_WIDTH
+            y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_COLOR_2_HEIGHT
+
+
+
+        CASE __GPU_MODE_HICOLOR_1
+            y~% = 0: DO
+                x~% = 0: DO
+                    PSET (x~%, y~%), Pallete_8BPP(VRAM(i~%))
+                    i~% = i~% + 1
+                x~% = x~% + 1: LOOP UNTIL x~% = __GPU_MODE_HICOLOR_1_WIDTH
+            y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_HICOLOR_1_HEIGHT
+
+        CASE __GPU_MODE_HICOLOR_2
+            y~% = 0: DO
+                x~% = 0: DO
+                    PSET (x~%, y~%), Pallete_8BPP(VRAM(i~%))
+                    i~% = i~% + 1
+                x~% = x~% + 1: LOOP UNTIL x~% = __GPU_MODE_HICOLOR_2_WIDTH
+            y~% = y~% + 1: LOOP UNTIL y~% = __GPU_MODE_HICOLOR_2_HEIGHT
 
     END SELECT
 END SUB
 
 SUB System_GPU_GeneratePalletes
-    SHARED Pallete_Color() AS _UNSIGNED LONG
-    SHARED Pallete_HiColor() AS _UNSIGNED LONG
+    SHARED Pallete_4BPP() AS _UNSIGNED LONG
+    SHARED Pallete_8BPP() AS _UNSIGNED LONG
 
     'Color pallete
     FOR i~%% = 0 TO 15
@@ -1303,7 +1395,7 @@ SUB System_GPU_GeneratePalletes
             G~%% = G~%% / 2
             B~%% = B~%% / 2
         END IF
-        Pallete_Color(i~%%) = _RGB32(R~%%, G~%%, B~%%)
+        Pallete_4BPP(i~%%) = _RGB32(R~%%, G~%%, B~%%)
     NEXT
 
     'HiColor pallete
@@ -1312,7 +1404,7 @@ SUB System_GPU_GeneratePalletes
         R~%% = _SHL(i~%% AND &B00000011, 6) OR A~%%
         G~%% = _SHL(i~%% AND &B00001100, 4) OR A~%%
         B~%% = _SHL(i~%% AND &B00110000, 2) OR A~%%
-        Pallete_HiColor(i~%%) = _RGB32(R~%%, G~%%, B~%%)
+        Pallete_8BPP(i~%%) = _RGB32(R~%%, G~%%, B~%%)
     NEXT
 END SUB
 

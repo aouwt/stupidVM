@@ -1,22 +1,43 @@
 	#include "./stupidVM.asm"
 
-MOUSEX	=	0x00	;2b
-MOUSEY	=	0x02	;2b
+MOUSEX	=	0x0000	;2b
+MOUSEY	=	0x0002	;2b
 
 #bank srom
 
-	load.a	#VMODE_HICOLOR
+	load.a	#1
 	store.a	GPU_VMODE
 	
+	load.m	#Text_1
+	subr	FANCYPRINT
+	jump	end
+	
+b:
+.loop:
+	load.a	GPU_WRITEBYTE
+	inc.a
+	store.a	GPU_WRITEBYTE
+	
+	load.m	GPU_WRITEADDR
+	comp.m	#32768
+	if.c	end
+	
+	jump	.loop
+	
+	jump	end
+a:
 .loop:
 	subr	UPDATEMOUSE
 	
-	load.a	MOUSEX
-	load.b	MOUSEY
+	load.a	MOUSEX+1
+	load.b	MOUSEY+1
 	subr	getvramaddr
+	
 	store.m	GPU_WRITEADDR
 	
-	load.a	#255
+	load.a	IO_MOUSE
+	
+	store.m	GPU_WRITEADDR
 	store.a	GPU_WRITEBYTE
 	
 	jump	.loop
@@ -27,16 +48,19 @@ MOUSEY	=	0x02	;2b
 
 
 getvramaddr:
-	and.a	#127
-	and.b	#127
-	move.a-ma
-.loop:
-	add.m	#128
-	dec.b
-	ifnz.b	.loop
+;	;and.a	#0b01111111
+;	;and.b	#0b01111111
+;	;load.m	#0
+;	;move.a-ma
+;.loop:
+;	add.m	#255
+;	dec.b
+;	ifnz.b	.loop
+;	
+;	return
 	
-	return
-	
+	move.ab-m
+	return	
 	
 	
 PRINT:
@@ -113,8 +137,8 @@ FANCYPRINT:
 NEWLINE:
 	load.a	GPU_WRITEADDR
 	inc.a
-	and.a	#0b11000000	; nearest multiple of 64
-	add.a	#0b01000000
+	and.a	#0b10000000	; nearest multiple of 64
+	add.a	#0b10000000
 	store.a	GPU_WRITEADDR
 	
 	ifz.a	.incnext
@@ -132,7 +156,7 @@ NEWLINE:
 Text_1:
 	#d	"Hello world!\n"
 	#d	"This is a testing program\n"
-	#d	"Playing 440Hz...\n\0"
+	#d	"hello hello hello\n\0"
 Text_2:
 	#d	"Playing 880hz...\n\0"
 
