@@ -79,7 +79,7 @@ CONST __GPU_MODE_TEXT_1 = 0
 CONST __GPU_MODE_TEXT_1_COLS = 64, __GPU_MODE_TEXT_1_ROWS = 64
 
 CONST __GPU_MODE_TEXT_2 = 1
-CONST __GPU_MODE_TEXT_2_COLS = 128, __GPU_MODE_TEXT_2_ROWS = 128
+CONST __GPU_MODE_TEXT_2_COLS = 128, __GPU_MODE_TEXT_2_ROWS = 64
 
 CONST __GPU_MODE_HIRES_1 = 2
 CONST __GPU_MODE_HIRES_1_WIDTH = 512, __GPU_MODE_HIRES_1_HEIGHT = 256
@@ -149,7 +149,7 @@ System_GPU_GeneratePalletes
 System_Sound_GenWaveforms
 _ECHO "done"
 
-TextModeFont& = _LOADFONT("/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf", 18, "MONOSPACE,DONTBLEND")
+TextModeFont& = 8 ' _LOADFONT("/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf", 18, "MONOSPACE,DONTBLEND")
 GPUImage& = _NEWIMAGE(8, 8, 32)
 Bus_DeviceActions __GPU_REG_VMODE
 
@@ -178,7 +178,7 @@ LOOP
 
 SUB System_CPU
     SHARED CPU AS CPURegisters
-    STATIC IRQ(&HF) AS _UNSIGNED INTEGER
+    STATIC IRQ(&HF) AS _UNSIGNED INTEGER, MRegs(7) AS _UNSIGNED INTEGER
 
     STATIC B AS _UNSIGNED _BYTE, I AS _UNSIGNED INTEGER, A AS _UNSIGNED INTEGER 'use STATIC *only* because I think its faster
 
@@ -538,44 +538,54 @@ SUB System_CPU
                 CASE &H0 'COMP.A <val>
                     GOSUB Addr_Imm
                     CPU.C = (CPU.A = B)
+                    CPU.Carry = (CPU.A < B)
 
                 CASE &H1 'COMP.A <addr>
                     GOSUB Addr_Abs
                     CPU.C = (CPU.A = B)
+                    CPU.Carry = (CPU.A < B)
 
                 CASE &H2 'COMP.A M
                     GOSUB Addr_M
                     CPU.C = (CPU.A = B)
+                    CPU.Carry = (CPU.A < B)
 
                 CASE &H3 'COMP.A B
                     CPU.C = (CPU.A = CPU.B)
+                    CPU.Carry = (CPU.A < CPU.B)
 
 
 
                 CASE &H4 'COMP.B <val>
                     GOSUB Addr_Imm
                     CPU.C = (CPU.B = B)
+                    CPU.Carry = (CPU.B < B)
 
                 CASE &H5 'COMP.B <addr>
                     GOSUB Addr_Abs
                     CPU.C = (CPU.B = B)
+                    CPU.Carry = (CPU.B < B)
 
                 CASE &H6 'COMP.B M
                     GOSUB Addr_M
                     CPU.C = (CPU.B = B)
+                    CPU.Carry = (CPU.B < B)
 
                 CASE &H7 'COMP.B A
                     CPU.C = (CPU.B = CPU.A)
+                    CPU.Carry = (CPU.B < CPU.A)
 
 
 
                 CASE &H8 'COMP.M <val>
                     GOSUB Addr_Imm_2B
                     CPU.C = (CPU.M = I)
+                    CPU.Carry = (CPU.M < I)
 
                 CASE &H9 'COMP.M <addr>
                     GOSUB Addr_Abs_2B
-                    CPU.M = (CPU.M = I)
+                    CPU.C = (CPU.M = I)
+                    CPU.Carry = (CPU.M < I)
 
 
                     'invalid ops
@@ -647,6 +657,12 @@ SUB System_CPU
                 CASE ELSE: GOTO InvalidOp
             END SELECT
 
+
+        CASE &HD0: SELECT CASE op2~%% 'MOVE.Mn-M/MOVE.M-Mn
+                CASE &H0 TO &H7: CPU.M = MRegs(op2~%%)
+
+                CASE ELSE: MRegs(op2~%% - 7) = CPU.M
+            END SELECT
 
 
 

@@ -1,0 +1,157 @@
+'''StupidVM''' is a fantasy console designed by [[User:Not_Applicable]]. It uses a custom designed 8-bit RISC processor (with limited 16-bit support), with up to 4072KiB of total RAM in the standard configuration (4064KiB banked, 8KiB static).
+
+= Machine specifications =
+
+The machine is made up of four main components in its default configuration:
+
+* The SMP100, the CPU
+* The SGC100, the graphics unit
+* The SAC110, the audio unit
+* The SMC101, the memory controller
+
+
+== The SMP100 ==
+The SMP100, the "core" of stupidVM, is a 8-bit CPU with limited support for 16-bit calculations. It has a 16-bit address bus, and a 8-bit data bus. Instructions are 1 byte long, not including arguments.
+
+=== Addressing modes ===
+The SMP100 has 4 primary addressing modes:
+
+{| class="wikitable"
+! Mode !! Example !! Description
+|-
+| Immediate || <code>load.a #10</code> || Loads A with a value of 10.
+|-
+| Absolute || <code>load.a 0x0300</code> || Loads A with the value that is stored at address <code>0x0300</code>, ex. 10.
+|-
+| M || <code>load.a M</code> || Loads A with the value that is stored at the address in the M register, ex. <code>0x1000</code>.
+|-
+| None || <code>inc.a</code> || Doesn't use a value at all.
+|}
+
+
+In addition to these, there are three that only apply to the <code>jump</code>, <code>subr</code>, and branching instructions:
+{| class="wikitable"
+! Mode !! Example !! Description
+|-
+| 2-byte immediate || <code>jump 0x1000</code> || Jumps to address <code>0x1000</code>.
+|-
+| Immediate M || <code>jump M</code> || Jumps to the address stored in the M register, ex. <code>0x3000</code>.
+|-
+| Relative || <code>jump 0x10</code> || Increments the PC by <code>0x10</code>.
+|}
+
+
+
+=== Registers ===
+The SMP100 has 5 primary registers:
+
+* 8-bit registers <code>A</code> and <code>B</code>.
+* 16-bit register <code>M</code>.
+* 1-bit flags <code>C</code> and <code>CAR</code> (carry).
+
+
+
+=== Opcodes ===
+''remind me to put them here please''
+
+
+
+== The SGC100 ==
+The graphics in stupidVM are provided by the SGC100. It has support for text and bitmap graphics. It has no hardware sprites nor graphics layers other than the primary one.
+It has 64KiB of VRAM available that can be accessed ''indirectly'' via it's device port.
+
+=== Registers ===
+The SGC100's device port is located in slot 1 (address <code>0xFF10</code>) by default, and are as follows:
+
+{| class="wikitable"
+!Location || <code>0</code> || <code>1</code> || <code>2</code> || <code>3</code> || <code>4</code> || <code>5</code> || <code>6</code> || <code>7</code> || <code>8</code> || <code>9</code> || <code>A</code> || <code>B</code> || <code>C</code> || <code>D</code> || <code>E</code> || <code>F</code>
+|-
+!Register || GPU_WRITEBYTE
+|colspan="2"|GPU_WRITEADDR||GPU_PAGEOFFSET
+|GPU_VMODE
+|}
+
+=== Video modes ===
+The SGC100 has 8 total video modes, 2 text and 6 bitmapped. The modes are as follows:
+{| class="wikitable"
+|+ Text modes
+|-
+! Mode !! Page size (bytes) !! Text screen size !! BPP (FG/BG)
+|-
+| 0 || 8192 || 64x64 || 4/4
+|-
+| 1 || 32768 || 128x128 || 4/4
+|}
+{| class="wikitable"
+|+ Graphics modes
+|-
+! Mode !! Page size (bytes) !! Resolution !! BPP
+| 2 || 16434 || 512x256 || 1
+|-
+| 3 || 32768 || 512x512 || 1
+|-
+| 4 || 16434 || 256x128 || 4
+|-
+| 5 || 32768 || 256x256 || 4
+|-
+| 6 || 32768 || 256x128 || 8
+|-
+| 7 || 65536 || 256x256 || 8
+|}
+
+==== Text modes ====
+In the text modes, the SGC100 uses 2 bytes per character, 1 byte to define the character, and 1 byte to determine the color. However, the colors aren't stored with each character, but rather seperately from them. This makes printing easier as you don't need to write both the color and the character for each character printed.
+
+The character set used is the US-ASCII character set, or whatever you set the text mode font's character set to.
+
+
+
+===== Color =====
+The color data is ''always'' stored 32768 bytes ahead of the start of the character data, and wraps around if needed.
+
+For each color byte, the foreground and background colors are stored in it. The foreground color is stored in the ''most'' signifigant 4 bits of the byte, and the background is in the ''least'' signifigant 4 bits of the byte.
+
+The pallete used for both the FG and BG is pallete 2.
+
+
+
+==== Graphics modes ====
+In the graphics modes, an array of bits/nybbles/bytes is used to determine the color of each pixel, depending on the mode used.
+
+
+===== Modes 2 and 3 =====
+Modes 2 and 3 are used for high resolution graphics, but they only allow for two colors: black, and white. Each bit represents each pixel, sequentially.
+
+The pallete used is pallete 1.
+
+
+===== Modes 4 and 5 =====
+Modes 4 and 5 are used for color graphics; they allow up to 16 colors. Every 4 bits represents each pixel, sequentially.
+
+The pallete used is pallete 2.
+
+
+===== Modes 6 and 7 =====
+Modes 6 and 7 are used for high color graphics; they allow up to 256 colors. Each byte represents each pixel, sequentially.
+
+The pallete used is pallete 3.
+
+
+
+
+
+
+
+
+
+
+
+{|class="wikitable"
+!Location || <code>0</code> || <code>1</code> || <code>2</code> || <code>3</code> || <code>4</code> || <code>5</code> || <code>6</code> || <code>7</code> || <code>8</code> || <code>9</code> || <code>A</code> || <code>B</code> || <code>C</code> || <code>D</code> || <code>E</code> || <code>F</code>
+|-
+!Register
+|<code>GPU_WRITEBYTE</code>
+|colspan="2"|<code>GPU_WRITEADDR</code>||<code>GPU_PAGEOFFSET</code>
+|<code>GPU_VMODE</code>
+|}
+
