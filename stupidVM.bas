@@ -33,6 +33,16 @@ TYPE SoundRegisters
     BufferLen AS _UNSIGNED INTEGER
 END TYPE
 
+TYPE CPRegisters
+    M AS _UNSIGNED LONG
+    PC AS _UNSIGNED INTEGER
+    Carry AS _UNSIGNED _BYTE
+    Reg AS _UNSIGNED _BYTE
+    R AS _UNSIGNED INTEGER
+    Halted AS _BYTE
+END TYPE
+
+
 CONST _
 __MAP_STATICRAM_BEGIN = &H0000& ,_
 __MAP_STACK_BEGIN     = &H1F00& ,_
@@ -60,6 +70,7 @@ __MAP_DEVICEREGS_SIZE = __MAP_DEVICEREGS_BEGIN - __MAP_DEVICEREGS_END
 CONST __MAP_DEVICE_SYS = __MAP_DEVICEREGS_BEGIN + &H00
 CONST __MAP_DEVICE_GPU = __MAP_DEVICEREGS_BEGIN + &H10
 CONST __MAP_DEVICE_SND = __MAP_DEVICEREGS_BEGIN + &H20
+CONST __MAP_DEVICE_CP = __MAP_DEVICEREGS_BEGIN + &H30
 
 
 CONST __SYS_BANKNO = __MAP_DEVICE_SYS + &H0 '1 byte
@@ -69,10 +80,12 @@ CONST __SYS_TIMER = __MAP_DEVICE_SYS + &H4 '1 byte
 
 
 CONST __GPU_REG_WRITE_BYTE = __MAP_DEVICE_GPU + &H0 '1 byte
-CONST __GPU_REG_WRITE_ADDR = __MAP_DEVICE_GPU + &H1 '2 bytes
-CONST __GPU_REG_PAGEOFFSET = __MAP_DEVICE_GPU + &H3 '1 byte
-CONST __GPU_REG_VMODE = __MAP_DEVICE_GPU + &H4 '1 byte
+CONST __GPU_REG_READ_BYTE = __MAP_DEVICE_GPU + &H1 '1 byte
+CONST __GPU_REG_WRITE_ADDR = __MAP_DEVICE_GPU + &H2 '2 bytes
+CONST __GPU_REG_PAGEOFFSET = __MAP_DEVICE_GPU + &H4 '2 bytes
+CONST __GPU_REG_VMODE = __MAP_DEVICE_GPU + &H6 '1 byte
 CONST __GPU_REG_WRITE = __GPU_REG_WRITE_BYTE
+CONST __GPU_REG_READ = __GPU_REG_READ_BYTE
 
 'video modes
 CONST __GPU_MODE_TEXT_1 = 0
@@ -106,15 +119,30 @@ CONST __GPU_VRAMSIZE = &HFFFF&
 
 
 
-CONST __SND_REG_WAVEFORMS = __MAP_DEVICE_SND + &H0 '1 byte
-CONST __SND_REG_VOLS = __MAP_DEVICE_SND + &H1 '2 bytes
-CONST __SND_REG_DUTIES = __MAP_DEVICE_SND + &H3 '2 bytes
-CONST __SND_REG_NOTES = __MAP_DEVICE_SND + &H5 '8 bytes
-CONST __SND_REG_WRITE_ADDR = __MAP_DEVICE_SND + &HD '1 byte
-CONST __SND_REG_WRITE_BYTE = __MAP_DEVICE_SND + &HE '1 byte
-CONST __SND_REG_WRITE = __SND_REG_WRITE_BYTE '1 btye
+'CONST __SND_REG_WAVEFORMS = __MAP_DEVICE_SND + &H0 '1 byte
+'CONST __SND_REG_VOLS = __MAP_DEVICE_SND + &H1 '2 bytes
+'CONST __SND_REG_DUTIES = __MAP_DEVICE_SND + &H3 '2 bytes
+'CONST __SND_REG_NOTES = __MAP_DEVICE_SND + &H5 '8 bytes
+'CONST __SND_REG_WRITE_ADDR = __MAP_DEVICE_SND + &HD '1 byte
+'CONST __SND_REG_WRITE_BYTE = __MAP_DEVICE_SND + &HE '1 byte
+'CONST __SND_REG_WRITE = __SND_REG_WRITE_BYTE '1 byte
 
-CONST __SND_BUFFERLEN = 1 / 60
+CONST __SND_REG_PITCH = __MAP_DEVICE_SND + &H0
+CONST __SND_REG_VOL = __MAP_DEVICE_SND + &H2
+CONST __SND_REG_WAVEFORM = __MAP_DEVICE_SND + &H3
+
+CONST __SND_BUFFERLEN = 1 / 30
+
+
+
+CONST __CP_REG_WRITE_BYTE = __MAP_DEVICE_CP + &H0 '1 byte
+CONST __CP_REG_READ_BYTE = __MAP_DEVICE_CP + &H1 '1 byte
+CONST __CP_REG_WRITE_ADDR = __MAP_DEVICE_CP + &H2 '2 bytes
+CONST __CP_REG_HALTED = __MAP_DEVICE_CP + &H4 '1 byte
+
+CONST __CP_RAM_SIZE = &HFFFF~%
+
+
 
 CONST __BANK_RAMBANKS = 10
 CONST __BANK_ROMBANKS = 1
@@ -129,15 +157,16 @@ DIM SHARED BankedRAM(__MAP_BANK_BEGIN TO __MAP_BANK_END, __BANK_RAMBANKS) AS _UN
 DIM SHARED BankedROM(__MAP_BANK_BEGIN TO __MAP_BANK_END, __BANK_ROMBANKS) AS _UNSIGNED _BYTE
 DIM SHARED DeviceRAM(__MAP_DEVICEREGS_BEGIN TO __MAP_DEVICEREGS_END) AS _UNSIGNED _BYTE
 DIM SHARED VRAM(__GPU_VRAMSIZE) AS _UNSIGNED _BYTE
+DIM SHARED CP_RAM(__CP_RAM_SIZE) AS _UNSIGNED _BYTE
 
 
 DIM SHARED GPUImage&, TextModeFont&
 DIM Pallete_4BPP(15) AS _UNSIGNED LONG
 DIM Pallete_8BPP(255) AS _UNSIGNED LONG
 
-DIM SHARED Waveforms(3, 255) AS SINGLE
+DIM SHARED Waveforms(255, 255) AS SINGLE
 
-DIM SHARED CPU AS CPURegisters, GPU AS GPURegisters
+DIM SHARED CPU AS CPURegisters, GPU AS GPURegisters, CP AS CPRegisters
 
 
 LoadROM "test.rom"
@@ -149,7 +178,7 @@ System_GPU_GeneratePalletes
 System_Sound_GenWaveforms
 _ECHO "done"
 
-TextModeFont& = 8 ' _LOADFONT("/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf", 18, "MONOSPACE,DONTBLEND")
+TextModeFont& = 8 ' _LOADFONT("/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf", 8, "MONOSPACE,DONTBLEND")
 GPUImage& = _NEWIMAGE(8, 8, 32)
 Bus_DeviceActions __GPU_REG_VMODE
 
@@ -157,6 +186,8 @@ screenimage& = _NEWIMAGE(640, 480, 32)
 SCREEN screenimage&
 DO
     System_CPU
+    'System_CP
+    System_Sound
     t! = TIMER(0.0001)
     IF NextUpdate! < t! THEN
         System_GPU
@@ -170,7 +201,7 @@ DO
             _FREEIMAGE tmp&
         END IF
 
-        _PUTIMAGE , GPUImage&, 0
+        _PUTIMAGE , GPUImage&, 0, , _SMOOTH
         _DISPLAY
         NextUpdate! = t! + UPDATEINTERVAL
     END IF
@@ -938,15 +969,17 @@ SUB System_CPU
 
     END SELECT
 
-CPU.Carry = (CPU.A > 255) OR _
-(CPU.B > 255) OR _
-(CPU.M > 65535) OR _
-(CPU.Carry)
+    CPU.Carry = (CPU.A > 255) OR _
+                (CPU.B > 255) OR _
+                (CPU.M > 65535) OR _
+                (CPU.Carry)
+
+
+    CPU.Carry = (CPU.Carry <> 0) ' AND &B1
 
     CPU.A = CPU.A AND &HFF
     CPU.B = CPU.B AND &HFF
     CPU.M = CPU.M AND &HFFFF
-    CPU.Carry = (CPU.Carry <> 1) AND &B1
 
     EXIT SUB
 
@@ -987,8 +1020,8 @@ CPU.Carry = (CPU.A > 255) OR _
     RETURN
 
     Push_2B:
-    Bus_Write __MEM_STACK_BEGIN + CPU.StackPtr, _SHR(I AND &HFF00, 8)
-    Bus_Write __MEM_STACK_BEGIN + CPU.StackPtr + 1, I AND &H00FF
+    Bus_Write __MEM_STACK_BEGIN + CPU.StackPtr, I AND &H00FF
+    Bus_Write __MEM_STACK_BEGIN + CPU.StackPtr + 1, _SHR(I AND &HFF00, 8)
     CPU.StackPtr = CPU.StackPtr + 2
     RETURN
 
@@ -999,13 +1032,187 @@ CPU.Carry = (CPU.A > 255) OR _
 
     Pull_2B:
     CPU.StackPtr = CPU.StackPtr - 2
-    I = B2I(Bus_Get(__MEM_STACK_BEGIN + CPU.StackPtr + 1), Bus_Get(__MEM_STACK_BEGIN + CPU.StackPtr))
+    I = B2I(Bus_Get(__MEM_STACK_BEGIN + CPU.StackPtr), Bus_Get(__MEM_STACK_BEGIN + CPU.StackPtr + 1))
     RETURN
 
     Interrupt:
 
     InvalidOp:
 END SUB
+
+'op~% = CP_PRGRAM(CP.pc)
+''opcode~%% = _SHR(op~% And &HFF00, 8)
+'Select Case op~%
+'    Case Is <= &B0011111111111111~%
+'    Case Is <= &B0111111111111111~%
+'    Case Is <= &B1000111111111111~%
+'    Case Is <= &B1001111111111111~%
+'    Case Is <= &B1010111111111111~%
+'    Case Is <= &B1011111111111111~%
+'    Case Is <= &B1100001111111111~%
+'    Case Is <= &B1101001111111111~%
+'    Case Is <= &B1101011111111111~%
+'    Case Is <= &B1101101111111111~%
+'    Case Is <= &B1101111111111111~%
+'    Case Is <= &B1110000011111111~%
+'    Case Is <= &B1110001011111111~%
+'    Case Is <= &B1110001111111111~%
+'    Case Is <= &B1110010011111111~%
+'    Case Is <= &B1110010111111111~%
+'    Case &HFFFF
+'End Select
+
+SUB System_CP
+
+    DIM B AS _UNSIGNED _BYTE, I AS _UNSIGNED INTEGER
+    STATIC Reg(3) AS _UNSIGNED _BYTE
+
+    IF CP.Halted THEN EXIT SUB
+
+    GOSUB Addr_Imm
+    SELECT CASE B AND &B11111000
+        CASE &B00000000 'LDR v
+            GOSUB Addr_Imm
+            CP.R = B
+
+        CASE &B00001000 'LDM v
+            GOSUB addr_imm_2b
+            CP.M = I
+
+        CASE &B00010000 'LDR a
+            GOSUB Addr_Abs
+            CP.R = B
+
+        CASE &B00011000 'LDM a
+            GOSUB Addr_Abs_2B
+            CP.M = I
+
+            'Case &B00100000 'invalid
+
+        CASE &B00101000 'LDR M
+            CP.R = CP_RAM(CP.M)
+
+        CASE &B00110000 'STR a
+            GOSUB addr_imm_2b
+            CP_RAM(I) = CP.R
+
+        CASE &B00111000 'STR M
+            CP_RAM(CP.M) = CP.R
+
+        CASE &B01000000 'CME v
+            GOSUB addr_imm_2b
+            CP.Carry = (CP.M = I)
+
+        CASE &B01001000 'CML v
+            GOSUB addr_imm_2b
+            CP.Carry = (CP.M < I)
+
+        CASE &B01010000 'CMG v
+            GOSUB addr_imm_2b
+            CP.Carry = (CP.M > I)
+
+        CASE &B01011000 'CMN v
+            GOSUB addr_imm_2b
+            CP.Carry = (CP.M <> I)
+
+        CASE &B01100000 'CRE v
+            GOSUB Addr_Imm
+            CP.Carry = (CP.R = B)
+
+        CASE &B01101000 'CRL v
+            GOSUB Addr_Imm
+            CP.Carry = (CP.R < B)
+
+        CASE &B01110000 'CRG v
+            GOSUB Addr_Imm
+            CP.Carry = (CP.R > B)
+
+        CASE &B01111000 'CRN v
+            GOSUB Addr_Imm
+            CP.Carry = (CP.R <> B)
+
+        CASE &B10000000 'INC
+            CP.R = CP.R + 1
+
+        CASE &B10001000 'INM
+            CP.M = CP.M + 1
+
+        CASE &B10010000 'DEC
+            CP.R = CP.R - 1
+
+        CASE &B10011000 'DEM
+            CP.M = CP.M - 1
+
+        CASE &B10100000 'JCS a
+            GOSUB addr_imm_2b
+            IF CP.Carry THEN CP.PC = I
+
+        CASE &B10101000 'JCC a
+            GOSUB addr_imm_2b
+            IF CP.Carry = 0 THEN CP.PC = I
+
+        CASE &B10110000 'SCS
+            CP.Carry = 1
+
+        CASE &B10111000 'SCC
+            CP.Carry = 0
+
+        CASE &B11000000 'ADD v
+            GOSUB Addr_Imm
+            CP.R = CP.R + B
+
+        CASE &B11001000 'ADM v
+            GOSUB addr_imm_2b
+            CP.M = CP.M + I
+
+        CASE &B11010000 'SUB v
+            GOSUB Addr_Imm
+            CP.R = CP.R - B
+
+        CASE &B11011000 'SBM v
+            GOSUB addr_imm_2b
+            CP.M = CP.M - I
+
+        CASE &B11100000 'REG 0-3
+            B = B AND &B11
+            Reg(CP.Reg) = CP.R
+            CP.Reg = B
+            CP.R = Reg(B)
+
+        CASE &B11101000 'JMP a
+            GOSUB addr_imm_2b
+            CP.PC = I
+
+            'Case &B11110000 'invalid
+        CASE &B11111000 'HLT
+            CP.Halted = 1
+    END SELECT
+
+    CP.Carry = CP.Carry OR (CP.M > &HFFFF~%) OR (CP.R > &HFF~%%)
+    EXIT SUB
+
+    Addr_Imm:
+    CP.PC = CP.PC + 1
+    B = CP_RAM(CP.PC)
+    RETURN
+
+    addr_imm_2b:
+    CP.PC = CP.PC + 2
+    I = B2I(CP_RAM(CP.PC - 1), CP_RAM(CP.PC))
+    RETURN
+
+    Addr_Abs:
+    CP.PC = CP.PC + 2
+    B = CP_RAM(B2I(CP_RAM(CP.PC - 1), CP_RAM(CP.PC)))
+    RETURN
+
+    Addr_Abs_2B:
+    CP.PC = CP.PC + 2
+    I = B2I(CP_RAM(CP.PC - 1), CP_RAM(CP.PC))
+    I = B2I(CP_RAM(I), CP_RAM(I + 1))
+    RETURN
+END SUB
+
 
 FUNCTION B2I~% (b1~%%, b2~%%)
     B2I~% = b1~%% OR _SHL(b2~%%, 8)
@@ -1089,6 +1296,39 @@ SUB Bus_DeviceActions (a~%)
             DeviceRAM(__GPU_REG_WRITE_ADDR + 1) = DeviceRAM(__GPU_REG_WRITE_ADDR + 1) - (i~%% = 255)
             DeviceRAM(__GPU_REG_WRITE_ADDR) = i~%% + 1
 
+        CASE __GPU_REG_READ
+            SHARED VRAM() AS _UNSIGNED _BYTE
+            DeviceRAM(__GPU_REG_READ_BYTE) = VRAM(B2I(DeviceRAM(__GPU_REG_WRITE_ADDR), DeviceRAM(__GPU_REG_WRITE_ADDR + 1)))
+
+            i~%% = DeviceRAM(__GPU_REG_WRITE_ADDR) 'incrememnt it
+            DeviceRAM(__GPU_REG_WRITE_ADDR + 1) = DeviceRAM(__GPU_REG_WRITE_ADDR + 1) - (i~%% = 255)
+            DeviceRAM(__GPU_REG_WRITE_ADDR) = i~%% + 1
+
+
+
+
+        CASE __CP_REG_WRITE
+            SHARED CP_RAM() AS _UNSIGNED _BYTE
+            CP_RAM(B2I(DeviceRAM(__CP_REG_WRITE_ADDR), DeviceRAM(__CP_REG_WRITE_ADDR + 1))) = DeviceRAM(__CP_REG_WRITE_BYTE)
+
+            i~%% = DeviceRAM(__CP_REG_WRITE_ADDR) 'incrememnt it
+            DeviceRAM(__CP_REG_WRITE_ADDR + 1) = DeviceRAM(__CP_REG_WRITE_ADDR + 1) - (i~%% = 255)
+            DeviceRAM(__CP_REG_WRITE_ADDR) = i~%% + 1
+
+
+        CASE __CP_REG_READ
+            SHARED CP_RAM() AS _UNSIGNED _BYTE
+            DeviceRAM(__CP_REG_READ_BYTE) = CP_RAM(B2I(DeviceRAM(__CP_REG_WRITE_ADDR), DeviceRAM(__CP_REG_WRITE_ADDR + 1)))
+
+            i~%% = DeviceRAM(__CP_REG_WRITE_ADDR) 'incrememnt it
+            DeviceRAM(__CP_REG_WRITE_ADDR + 1) = DeviceRAM(__CP_REG_WRITE_ADDR + 1) - (i~%% = 255)
+            DeviceRAM(__CP_REG_WRITE_ADDR) = i~%% + 1
+
+
+        CASE __CP_REG_HALTED
+            SHARED CP AS CPRegisters
+            DeviceRAM(__CP_REG_HALTED) = CP.Halted
+
 
 
         CASE __GPU_REG_VMODE
@@ -1133,19 +1373,18 @@ SUB Bus_DeviceActions (a~%)
 
 
 
-        CASE __GPU_REG_PAGEOFFSET
+        CASE __GPU_REG_PAGEOFFSET, __GPU_REG_PAGEOFFSET + 1
             SHARED GPU AS GPURegisters
-            GPU.PageOffset = _SHL(DeviceRAM(__GPU_REG_PAGEOFFSET), 8)
+            GPU.PageOffset = B2I(DeviceRAM(__GPU_REG_PAGEOFFSET + 1), DeviceRAM(__GPU_REG_PAGEOFFSET))
 
-        CASE __SND_REG_WRITE
-            SHARED Waveforms() AS SINGLE
-            tmp~%% = DeviceRAM(__SND_REG_WRITE_ADDR) * 4
-            tmp! = DeviceRAM(__SND_REG_WRITE_BYTE) / 255
-            Waveforms(3, tmp~%%) = tmp!
-            Waveforms(3, tmp~%% + 1) = tmp!
-            Waveforms(3, tmp~%% + 2) = tmp!
-            Waveforms(3, tmp~%% + 3) = tmp!
-
+            'CASE __SND_REG_WRITE
+            '    SHARED Waveforms() AS SINGLE
+            '    tmp~%% = DeviceRAM(__SND_REG_WRITE_ADDR) * 4
+            '    tmp! = DeviceRAM(__SND_REG_WRITE_BYTE) / 255
+            '    Waveforms(3, tmp~%%) = tmp!
+            '    Waveforms(3, tmp~%% + 1) = tmp!
+            '    Waveforms(3, tmp~%% + 2) = tmp!
+            '    Waveforms(3, tmp~%% + 3) = tmp!
     END SELECT
 END SUB
 
@@ -1189,97 +1428,141 @@ SUB LoadROM (f$)
 END SUB
 
 
-SUB System_Sound
+'SUB System_Sound
 
-    CONST PwrOf2 = 2 ^ (1 / 12)
+'    CONST PwrOf2 = 2 ^ (1 / 12)
 
-    TYPE Channel
-        Wave AS _UNSIGNED _BYTE
-        'Freq AS _UNSIGNED INTEGER
-        Frac AS _UNSIGNED INTEGER
-        Duty AS _UNSIGNED _BYTE
-        Vol AS SINGLE
-    END TYPE
+'    TYPE Channel
+'        Wave AS _UNSIGNED _BYTE
+'        'Freq AS _UNSIGNED INTEGER
+'        Frac AS _UNSIGNED INTEGER
+'        Duty AS _UNSIGNED _BYTE
+'        Vol AS SINGLE
+'    END TYPE
 
-    STATIC Time AS _UNSIGNED _INTEGER64
-    STATIC Ch(3) AS Channel
-    SHARED Waveforms() AS SINGLE
-    DIM Wave(3, 255) AS SINGLE
-
-
-
-
-    'Waveform byte (numbers represent channels): 00112233
-    Ch(0).Wave = _SHR(DeviceRAM(__SND_REG_WAVEFORMS) AND &B11000000, 6)
-    Ch(1).Wave = _SHR(DeviceRAM(__SND_REG_WAVEFORMS) AND &B00110000, 4)
-    Ch(2).Wave = _SHR(DeviceRAM(__SND_REG_WAVEFORMS) AND &B00001100, 2)
-    Ch(3).Wave = DeviceRAM(__SND_REG_WAVEFORMS) AND &B00000011
-
-    'vol bytes (numbers represent channels): 00001111 22223333      'we need to get a SINGLE value
-    Ch(0).Vol = _SHR(DeviceRAM(__SND_REG_VOLS) AND &B11110000, 4) / 16
-    Ch(1).Vol = (DeviceRAM(__SND_REG_VOLS) AND &B00001111) / 16
-    Ch(2).Vol = _SHR(DeviceRAM(__SND_REG_VOLS + 1) AND &B11110000, 4) / 16
-    Ch(3).Vol = (DeviceRAM(__SND_REG_VOLS + 1) AND &B00001111) / 16
-
-    'duty bytes (numbers represent channels): 00001111 22223333      'note: we need to amplify the duty to improve speed later on, so we "invert" this one
-    'also because reasons we need to dec by one so we do that here
-    Ch(0).Duty = _SHR(DeviceRAM(__SND_REG_DUTIES) AND &B11110000, 1) OR &B10000000
-    Ch(1).Duty = _SHL(DeviceRAM(__SND_REG_DUTIES) AND &B00001111, 3) OR &B10000000
-    Ch(2).Duty = _SHR(DeviceRAM(__SND_REG_DUTIES + 1) AND &B11110000, 1) OR &B10000000
-    Ch(3).Duty = _SHL(DeviceRAM(__SND_REG_DUTIES + 1) AND &B00001111, 3) OR &B10000000
-
-    ch~%% = 0: DO
-        i~%% = _SHL(ch~%%, 1) 'fastest way to do *2
-        note~%% = DeviceRAM(__SND_REG_NOTES + i~%%)
-        shift%% = DeviceRAM(__SND_REG_NOTES + i~%% + 1)
-
-
-
-        'REM f(n) = 2^((n-29)/12) * 440 'where n is semitones and f is frequency
-        'REM N = note + (s / 127)       'where N is final semitones, n is semitones in reg, and s is shift
-        ''therefore:
-        'REM f(n,s) = 2^(((n+(s/127))/12) * 440  'where f is frequency, n is semitones in reg, and s is shift
-        '        freq! = (2 ^ (((note~%% + (shift%% / 127)) - 49) / 12)) * 440
-
-        freq! = (PwrOf2 ^ (note~%% - 49)) * 440
-        'IF freq! = 0 THEN freq! = 1
-        Ch(ch~%%).Frac = _SNDRATE / freq!
-
-
-        IF Ch(ch~%%).Frac THEN
-            i~%% = 0: DO
-                Wave(ch~%%, i~%%) = Waveforms(Ch(ch~%%).Wave, i~%%) * Ch(ch~%%).Vol
-            i~%% = i~%% + 1: LOOP UNTIL i~%% >= Ch(ch~%%).Duty
-        ELSE Ch(ch~%%).Frac = 1
-        END IF
-
-    ch~%% = ch~%% + 1: LOOP UNTIL ch~%% = 4
-
-
-    DO
-        _SNDRAW (Wave(0, (Time MOD Ch(0).Frac) AND &HFF) + Wave(1, (Time MOD Ch(1).Frac) AND &HFF) + Wave(2, (Time MOD Ch(2).Frac) AND &HFF) + Wave(3, (Time MOD Ch(3).Frac) AND &HFF)) / 4
-    Time = Time + 1: LOOP UNTIL _SNDRAWLEN >= __SND_BUFFERLEN
-END SUB
+'    STATIC Time AS _BYTE
+'    STATIC Ch(3) AS Channel
+'    SHARED Waveforms() AS SINGLE
+'    STATIC Wave(3, 255) AS SINGLE
 
 
 
 
+'    'Waveform byte (numbers represent channels): 00112233
+'    Ch(0).Wave = _SHR(DeviceRAM(__SND_REG_WAVEFORMS) AND &B11000000, 6)
+'    Ch(1).Wave = _SHR(DeviceRAM(__SND_REG_WAVEFORMS) AND &B00110000, 4)
+'    Ch(2).Wave = _SHR(DeviceRAM(__SND_REG_WAVEFORMS) AND &B00001100, 2)
+'    Ch(3).Wave = DeviceRAM(__SND_REG_WAVEFORMS) AND &B00000011
+
+'    'vol bytes (numbers represent channels): 00001111 22223333      'we need to get a SINGLE value
+'    Ch(0).Vol = _SHR(DeviceRAM(__SND_REG_VOLS) AND &B11110000, 4) / 16
+'    Ch(1).Vol = (DeviceRAM(__SND_REG_VOLS) AND &B00001111) / 16
+'    Ch(2).Vol = _SHR(DeviceRAM(__SND_REG_VOLS + 1) AND &B11110000, 4) / 16
+'    Ch(3).Vol = (DeviceRAM(__SND_REG_VOLS + 1) AND &B00001111) / 16
+
+'    'duty bytes (numbers represent channels): 00001111 22223333      'note: we need to amplify the duty to improve speed later on, so we "invert" this one
+'    'also because reasons we need to dec by one so we do that here
+'    Ch(0).Duty = _SHR(DeviceRAM(__SND_REG_DUTIES) AND &B11110000, 1) OR &B10000000
+'    Ch(1).Duty = _SHL(DeviceRAM(__SND_REG_DUTIES) AND &B00001111, 3) OR &B10000000
+'    Ch(2).Duty = _SHR(DeviceRAM(__SND_REG_DUTIES + 1) AND &B11110000, 1) OR &B10000000
+'    Ch(3).Duty = _SHL(DeviceRAM(__SND_REG_DUTIES + 1) AND &B00001111, 3) OR &B10000000
+
+'    ch~%% = 0: DO
+'        i~%% = _SHL(ch~%%, 1) 'fastest way to do *2
+'        note~%% = DeviceRAM(__SND_REG_NOTES + i~%%)
+'        shift%% = DeviceRAM(__SND_REG_NOTES + i~%% + 1)
+
+
+'        'REM f(n) = 2^((n-29)/12) * 440 'where n is semitones and f is frequency
+'        'REM N = note + (s / 127)       'where N is final semitones, n is semitones in reg, and s is shift
+'        ''therefore:
+'        'REM f(n,s) = 2^(((n+(s/127))/12) * 440  'where f is frequency, n is semitones in reg, and s is shift
+'        '        freq! = (2 ^ (((note~%% + (shift%% / 127)) - 49) / 12)) * 440
+
+'        freq! = (PwrOf2 ^ (note~%% - 49)) * 440
+'        'IF freq! = 0 THEN freq! = 1
+'        Ch(ch~%%).Frac = _SNDRATE / freq!
+
+
+'        IF Ch(ch~%%).Frac THEN
+'            i~%% = 0: DO
+'                Wave(ch~%%, i~%%) = Waveforms(Ch(ch~%%).Wave, i~%% MOD Ch(ch~%%).Duty) * Ch(ch~%%).Vol
+'            i~%% = i~%% + 1: LOOP WHILE i~%%
+'        ELSE Ch(ch~%%).Frac = 1
+'        END IF
+
+'    ch~%% = ch~%% + 1: LOOP UNTIL ch~%% = 4
+
+
+'    DO
+'        _SNDRAW (Wave(0, (Time MOD Ch(0).Frac) AND &HFF) + Wave(1, (Time MOD Ch(1).Frac) AND &HFF) + Wave(2, (Time MOD Ch(2).Frac) AND &HFF) + Wave(3, (Time MOD Ch(3).Frac) AND &HFF)) / 4
+'    Time = Time + 1: LOOP UNTIL _SNDRAWLEN >= __SND_BUFFERLEN
+'END SUB
+
+
+
+
+
+'SUB System_Sound_GenWaveforms
+'    SHARED Waveforms() AS SINGLE
+'    FOR i~%% = 0 TO 255
+'        Waveforms(0, i~%%) = INT(i~%% / 127)
+'        Waveforms(1, i~%%) = ABS(i~%% - 127) / 127
+'        Waveforms(2, i~%%) = RND
+'    NEXT
+'END SUB
 
 SUB System_Sound_GenWaveforms
     SHARED Waveforms() AS SINGLE
     FOR i~%% = 0 TO 255
-        Waveforms(0, i~%%) = 1
-        Waveforms(1, i~%%) = ABS(i~%% - 127) / 127
-        Waveforms(2, i~%%) = RND
+        FOR t~%% = 0 TO 255
+            IF i~%% >= 127 THEN
+                Waveforms(i~%%, t~%%) = (t~%% >= (i~%% - 127) / 2)
+            ELSE
+                SELECT CASE i~%% AND &B11
+                    CASE 0: Waveforms(i~%%, t~%%) = t~%% / 255
+                    CASE 1: Waveforms(i~%%, t~%%) = ABS(t~%% - 127) / 255
+                    CASE 2: Waveforms(i~%%, t~%%) = INT(RND * 16) / 16
+                    CASE 3: Waveforms(i~%%, t~%%) = _ROUND(RND)
+                END SELECT
+            END IF
+        NEXT
     NEXT
-    'Waveforms(0, 255) = 0 'becauase yes
 END SUB
 
+
+SUB System_Sound
+    STATIC Time AS _BYTE
+    SHARED Waveforms() AS SINGLE
+    STATIC Wave(0 TO 3, 255) AS SINGLE
+    STATIC Frac(0 TO 3) AS _UNSIGNED LONG
+
+
+
+    ch~%% = 0: DO
+        i~%% = _SHL(ch~%%, 2) 'fastest way to do *4
+        'DIM CurCh AS channel
+        Frac(ch~%%) = _SNDRATE / B2I(DeviceRAM(__SND_REG_PITCH + i~%%), DeviceRAM(__SND_REG_PITCH + i~%% + 1))
+        vol! = DeviceRAM(__SND_REG_VOL + i~%%) / 255
+        IF Frac(ch~%%) = 0 THEN Frac(ch~%%) = 1
+        wform~%% = DeviceRAM(__SND_REG_WAVEFORM + i~%%)
+
+        DO: t~%% = t~%% + 1
+            Wave(ch~%%, t~%%) = Waveforms(wform~%%, t~%%) * vol!
+        LOOP WHILE t~%%
+    ch~%% = ch~%% + 1: LOOP UNTIL ch~%% = 4
+
+
+    DO
+        _SNDRAW (Wave(0, (Time MOD Frac(0)) AND &HFF) + Wave(1, (Time MOD Frac(1)) AND &HFF) + Wave(2, (Time MOD Frac(2)) AND &HFF) + Wave(3, (Time MOD Frac(3)) AND &HFF)) / 4
+    Time = Time + 1: LOOP UNTIL _SNDRAWLEN >= __SND_BUFFERLEN
+
+END SUB
 
 
 SUB System_GPU
     'System_Sound
-    System_Sound
+    'System_Sound
     SHARED GPUImage&, TextModeFont&, GPU AS GPURegisters
     SHARED VRAM() AS _UNSIGNED _BYTE
 
@@ -1317,14 +1600,14 @@ SUB System_GPU
                 x~% = 0: DO
 
                     b~%% = VRAM(i~%) 'fastest way to do this ig
-                    IF b~%% AND &B00000001 THEN PSET (x~%, y~%)
-                    IF b~%% AND &B00000010 THEN PSET (x~% + 1, y~%)
-                    IF b~%% AND &B00000100 THEN PSET (x~% + 2, y~%)
-                    IF b~%% AND &B00001000 THEN PSET (x~% + 3, y~%)
-                    IF b~%% AND &B00010000 THEN PSET (x~% + 4, y~%)
-                    IF b~%% AND &B00100000 THEN PSET (x~% + 5, y~%)
-                    IF b~%% AND &B01000000 THEN PSET (x~% + 6, y~%)
-                    IF b~%% AND &B10000000 THEN PSET (x~% + 7, y~%)
+                    IF b~%% AND &B00000001 THEN PSET (x~% + 7, y~%)
+                    IF b~%% AND &B00000010 THEN PSET (x~% + 6, y~%)
+                    IF b~%% AND &B00000100 THEN PSET (x~% + 5, y~%)
+                    IF b~%% AND &B00001000 THEN PSET (x~% + 4, y~%)
+                    IF b~%% AND &B00010000 THEN PSET (x~% + 3, y~%)
+                    IF b~%% AND &B00100000 THEN PSET (x~% + 2, y~%)
+                    IF b~%% AND &B01000000 THEN PSET (x~% + 1, y~%)
+                    IF b~%% AND &B10000000 THEN PSET (x~%, y~%)
                     i~% = i~% + 1
 
                 x~% = x~% + 8: LOOP UNTIL x~% = __GPU_MODE_HIRES_1_WIDTH
@@ -1335,14 +1618,14 @@ SUB System_GPU
                 x~% = 0: DO
 
                     b~%% = VRAM(i~%) 'fastest way to do this ig
-                    IF b~%% AND &B00000001 THEN PSET (x~%, y~%)
-                    IF b~%% AND &B00000010 THEN PSET (x~% + 1, y~%)
-                    IF b~%% AND &B00000100 THEN PSET (x~% + 2, y~%)
-                    IF b~%% AND &B00001000 THEN PSET (x~% + 3, y~%)
-                    IF b~%% AND &B00010000 THEN PSET (x~% + 4, y~%)
-                    IF b~%% AND &B00100000 THEN PSET (x~% + 5, y~%)
-                    IF b~%% AND &B01000000 THEN PSET (x~% + 6, y~%)
-                    IF b~%% AND &B10000000 THEN PSET (x~% + 7, y~%)
+                    IF b~%% AND &B00000001 THEN PSET (x~% + 7, y~%)
+                    IF b~%% AND &B00000010 THEN PSET (x~% + 6, y~%)
+                    IF b~%% AND &B00000100 THEN PSET (x~% + 5, y~%)
+                    IF b~%% AND &B00001000 THEN PSET (x~% + 4, y~%)
+                    IF b~%% AND &B00010000 THEN PSET (x~% + 3, y~%)
+                    IF b~%% AND &B00100000 THEN PSET (x~% + 2, y~%)
+                    IF b~%% AND &B01000000 THEN PSET (x~% + 1, y~%)
+                    IF b~%% AND &B10000000 THEN PSET (x~%, y~%)
                     i~% = i~% + 1
 
                 x~% = x~% + 8: LOOP UNTIL x~% = __GPU_MODE_HIRES_2_WIDTH

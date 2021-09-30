@@ -1,0 +1,15 @@
+ outp | addr | data
+
+  0:0 | a000 | 00 00    ; load.a #VMODE_TEXT
+  2:0 | a002 | 41 13 ff ; store.a GPU_VMODE
+  5:0 | a005 |          ; .start:
+  5:0 | a005 | 09 15 a0 ; load.m .text
+  8:0 | a008 |          ; .print:
+  8:0 | a008 | 06       ; load.b M
+  9:0 | a009 | 45 10 ff ; store.b GPU_WRITEBYTE
+  c:0 | a00c | 9a       ; inc.m
+  d:0 | a00d | 38 0d    ; comp.m #textlen
+  f:0 | a00f | 69 05 a0 ; if.c .start
+ 12:0 | a012 | 0d 08 a0 ; jump .print
+ 15:0 | a015 |          ; .text:
+ 15:0 | a015 | 48 65 6c 6c 6f 2c 20 77 6f 72 6c 64 21 ; #d "Hello, world!"
