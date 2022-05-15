@@ -103,6 +103,8 @@ OP (read_stk2) {
 	};
 }
 
+OP (nothing) {}
+
 OP (load_a)	{ _this -> Reg.A = IStor_8; }
 OP (load_b)	{ _this -> Reg.B = IStor_8; }
 OP (load_m)	{ _this -> Reg.M = IStor_16; }
@@ -118,9 +120,15 @@ OP (add_a)	{ _this -> Reg.A += IStor_8; }
 OP (add_b)	{ _this -> Reg.B += IStor_8; }
 OP (add_a_b)	{ _this -> Reg.A += _this -> Reg.B; }
 OP (add_b_a)	{ _this -> Reg.B += _this -> Reg.A; }
+OP (add_m)	{ _this -> Reg.M += IStor_16; }
 
 OP (subr)	{ IStor2_8 = (_this -> Reg.PC + 2) && 0xFF00; IStor3_8 = (_this -> Reg.PC + 2) & 0x00FF; }
 
+OP (comp_a)	{ _this -> Reg.C = (_this -> Reg.A == IStor_8); _this -> Reg.Carry = (_this -> Reg.A < IStor_8); }
+OP (comp_b)	{ _this -> Reg.C = (_this -> Reg.B == IStor_8); _this -> Reg.Carry = (_this -> Reg.B < IStor_8); }
+OP (comp_a_b)	{ _this -> Reg.C = (_this -> Reg.A == _this -> Reg.B); _this -> Reg.Carry = (_this -> Reg.A < _this -> Reg.B); }
+OP (comp_b_a)	{ _this -> Reg.C = (_this -> Reg.B == _this -> Reg.A); _this -> Reg.Carry = (_this -> Reg.B < _this -> Reg.A); }
+OP (comp_m)	{ _this -> Reg.C = (_this -> Reg.M == IStor_16); _this -> Reg.Carry = (_this -> Reg.M < IStor_16); }
 
 #undef OP
 #define OP(name, ...) \
@@ -183,9 +191,13 @@ OP (AddB_Abs,	ABS, &add_b);
 OP (AddB_M,	MAD, &add_b);
 OP (AddB_A,	&add_b_a);
 
-// NOTE: really stupid
-OP (Subr_Adr,	&subr, PUSH16, IMM16, &jump_adr);
-OP (Subr_M,	&subr, PUSH16, M16, &jump_adr);
+OP (AddM_Imm,	IMM16, &add_m);
+OP (AddM_Abs,	ABS16, &add_m);
+OP (AddM_M,	M16, &add_m);
+
+
+//OP (SubA_Imm,	IMM, 
+
 
 OP (CompA_Imm,	IMM, &comp_a);
 OP (CompA_Abs,	ABS, &comp_a);
@@ -199,4 +211,10 @@ OP (CompB_A,	&comp_b_a);
 
 OP (CompM_Imm,	IMM16, &comp_m);
 OP (CompM_Abs,	ABS16, &comp_m);
+
+// NOTE: really stupid
+OP (Subr_Adr,	&subr, PUSH16, IMM16, &jump_adr);
+OP (Subr_M,	&subr, PUSH16, M16, &jump_adr);
+
+
 
