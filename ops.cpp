@@ -12,6 +12,27 @@
 #define IStor3_8 \
 	_this -> Reg.IStor
 
+template <typename T>
+	T rotate_left (T val) {
+		return (val << 1) | ((val & (1 << (sizeof (T) * 8 - 1))) != 0);
+	}
+
+template <typename T>
+	T rotate_right (T val) {
+		return (val >> 1) | ((val & 1) << (sizeof (T) * 8 - 1));
+	}
+
+template <typename T>
+	T rotate_left (T val, bool carry) {
+		return rotate_left <T> (val) | carry;
+	}
+
+template <typename T>
+	T rotate_right (T val, bool carry) {
+		return rotate_right <T> (val) | (carry << (sizeof (T) * 8 - 1));
+	}
+
+
 OP (readnext) {
 	_this -> Bus = {
 		.RW = READ,
@@ -105,6 +126,9 @@ OP (read_stk2) {
 
 OP (nothing) {}
 
+
+
+
 OP (load_a)	{ _this -> Reg.A = IStor_8; }
 OP (load_b)	{ _this -> Reg.B = IStor_8; }
 OP (load_m)	{ _this -> Reg.M = IStor_16; }
@@ -115,6 +139,7 @@ OP (jump_adr)	{ _this -> Reg.PC = IStor_16; }
 OP (write_a)	{ IStor2_8 = _this -> Reg.A; }
 OP (write_b)	{ IStor2_8 = _this -> Reg.B; }
 OP (write_m)	{ IStor2_8 = _this -> Reg.M & 0xFF00; IStor3_8 = _this -> Reg.M & 0x00FF; }
+OP (write_pc)	{ IStor2_8 = _this -> Reg.PC & 0xFF00; IStor3_8 = _this -> Reg.PC & 0x00FF; }
 
 OP (add_a)	{ _this -> Reg.A += IStor_8; }
 OP (add_b)	{ _this -> Reg.B += IStor_8; }
@@ -133,6 +158,36 @@ OP (comp_b)	{ _this -> Reg.C = (_this -> Reg.B == IStor_8); _this -> Reg.Carry =
 OP (comp_a_b)	{ _this -> Reg.C = (_this -> Reg.A == _this -> Reg.B); _this -> Reg.Carry = (_this -> Reg.A < _this -> Reg.B); }
 OP (comp_b_a)	{ _this -> Reg.C = (_this -> Reg.B == _this -> Reg.A); _this -> Reg.Carry = (_this -> Reg.B < _this -> Reg.A); }
 OP (comp_m)	{ _this -> Reg.C = (_this -> Reg.M == IStor_16); _this -> Reg.Carry = (_this -> Reg.M < IStor_16); }
+
+OP (lsh_a)	{ _this -> Reg.A = rotate_left (_this -> Reg.A, _this -> Reg.Carry); } // let auto carry functions handle carry
+OP (rsh_a)	{ _this -> Reg.A = rotate_right (_this -> Reg.A, _this -> Reg.Carry); }
+OP (lsh_b)	{ _this -> Reg.B = rotate_left (_this -> Reg.B, _this -> Reg.Carry); }
+OP (rsh_b)	{ _this -> Reg.B = rotate_right (_this -> Reg.B, _this -> Reg.Carry); }
+OP (lsh_m)	{ _this -> Reg.M = rotate_left (_this -> Reg.M, _this -> Reg.Carry); }
+OP (rsh_m)	{ _this -> Reg.M = rotate_right (_this -> Reg.M, _this -> Reg.Carry); }
+OP (lsh_pc)	{ _this -> Reg.PC = rotate_left (_this -> Reg.PC, _this -> Reg.Carry); }
+OP (rsh_pc)	{ _this -> Reg.PC = rotate_right (_this -> Reg.PC, _this -> Reg.Carry); }
+
+OP (lrot_a)	{ _this -> Reg.A = rotate_left <uint8_t> (_this -> Reg.A); } // we dont want carry to trigger so we must tell it to only rotate the last byte
+OP (rrot_a)	{ _this -> Reg.A = rotate_right <uint8_t> (_this -> Reg.A); }
+OP (lrot_b)	{ _this -> Reg.B = rotate_left <uint8_t> (_this -> Reg.B); }
+OP (rrot_b)	{ _this -> Reg.B = rotate_right <uint8_t> (_this -> Reg.B); }
+OP (lrot_m)	{ _this -> Reg.M = rotate_left <uint16_t> (_this -> Reg.M); }
+OP (rrot_m)	{ _this -> Reg.M = rotate_right <uint16_t> (_this -> Reg.M); }
+OP (lrot_pc)	{ _this -> Reg.PC = rotate_left <uint16_t> (_this -> Reg.PC); }
+OP (rrot_pc)	{ _this -> Reg.PC = rotate_right <uint16_t> (_this -> Reg.PC); }
+
+OP (inc_a)	{ _this -> Reg.A ++; }
+OP (dec_a)	{ _this -> Reg.A --; }
+OP (inc_b)	{ _this -> Reg.B ++; }
+OP (dec_b)	{ _this -> Reg.B --; }
+OP (inc_m)	{ _this -> Reg.M ++; }
+OP (dec_m)	{ _this -> Reg.M --; }
+OP (inc_pc)	{ _this -> Reg.PC ++; }
+OP (dec_pc)	{ _this -> Reg.PC --; }
+
+OP (clr_car)	{ _this -> Reg.Carry = false; }
+OP (clr_c)	{ _this -> Reg.C = false; }
 
 
 OP (subr)	{ IStor2_8 = (_this -> Reg.PC + 2) && 0xFF00; IStor3_8 = (_this -> Reg.PC + 2) & 0x00FF; }
@@ -186,7 +241,7 @@ OP (StoreB_M,	M16, &write_b, WRITE);
 OP (StoreM_Adr,	IMM16, &write_m, WRITE16);
 OP (StoreM_M,	M16, &write_m, WRITE16); // invalid opcode :D
 
-they’d
+
 OP (AddA_Imm,	IMM, &add_a);
 OP (AddA_Abs,	ABS, &add_a);
 OP (AddA_M,	MAD, &add_a);
@@ -235,14 +290,44 @@ OP (LShA,	&lsh_a);
 OP (RShA,	&rsh_a);
 OP (LShB,	&lsh_b);
 OP (RShB,	&rsh_b);
+OP (LShM,	&lsh_m, &nothing);
+OP (RShM,	&rsh_m, &nothing);
+OP (LShPC,	&lsh_pc, &nothing);
+OP (RShPC,	&rsh_pc, &nothing);
 
-OP (LRotA,	&lrot_a);
-OP (RRotA,	&rrot_a);
-OP (LRotB,	&lrot_b);
-OP (RRotB,	&rrot_b);
+OP (LRotA,	&clr_car, &lrot_a);
+OP (RRotA,	&clr_car, &rrot_a);
+OP (LRotB,	&clr_car, &lrot_b);
+OP (RRotB,	&clr_car, &rrot_b);
+OP (LRotM,	&clr_car, &lrot_m, &nothing);
+OP (RRotM,	&clr_car, &rrot_m, &nothing);
+OP (LRotPC,	&clr_car, &lrot_pc, &nothing);
+OP (RRotPC,	&clr_car, &rrot_pc, &nothing);
 
-// NOTE: really stupid
-OP (Subr_Adr,	&subr, PUSH16, IMM16, &jump_adr);
-OP (Subr_M,	&subr, PUSH16, M16, &jump_adr);
+
+OP (PushA,	&write_a, PUSH);
+OP (PullA,	PULL, &load_a);
+OP (IncA,	&inc_a);
+OP (DecA,	&dec_a);
+
+OP (PushB,	&write_b, PUSH);
+OP (PullB,	PULL, &load_b);
+OP (IncB,	&inc_b);
+OP (DecB,	&dec_b);
+
+OP (PushM,	&write_m, PUSH16);
+OP (PullM,	PULL, &load_m);
+OP (IncM,	&inc_m);
+OP (DecM,	&dec_m);
+
+OP (PushPC,	&write_pc, PUSH16);
+OP (PullPC,	PULL16, &jump_adr);
+OP (IncPC,	&inc_pc);
+OP (DecPC,	&dec_pc);
+
+OP (Subr_Adr,	&subr, &nothing, PUSH16, IMM16, &jump_adr);
+OP (Subr_M,	&subr, &nothing, PUSH16, M16, &jump_adr);
+
+
 
 

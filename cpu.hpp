@@ -27,9 +27,9 @@ class SMP100 {
 			uint_fast32_t M;
 			
 			bool Carry;
-			uint16_t PC;
-			uint16_t IntRet;
-			uint8_t StackPtr;
+			uint_fast32_t PC;
+			uint_fast16_t IntRet;
+			uint_fast8_t StackPtr;
 			
 			uint_fast8_t IStor;
 			uint_fast16_t IStor2;
@@ -47,5 +47,26 @@ void SMP100::Cycle (void) {
 	if (++ Operation == NULL)
 		Operation = &Op_BeginCycle;
 	
-	Operation (this)
+	Operation (this);
+	
+	if (Reg.A > 0xFF) {
+		Reg.A &= 0xFF;
+		Reg.Carry |= true;
+	}
+	if (Reg.B > 0xFF) {
+		Reg.B &= 0xFF;
+		Reg.Carry |= true;
+	}
+	if (Reg.M > 0xFFFF) {
+		Reg.M &= 0xFFFF;
+		Reg.Carry |= true;
+	}
+	if (Reg.PC > 0xFFFF) {
+		Reg.PC &= 0xFFFF;
+		Reg.Carry |= true;
+	}
+	if (Reg.StackPtr > 0xFF) {
+		Reg.StackPtr &= 0xFF;
+		Reg.Carry |= true;
+	}
 }
