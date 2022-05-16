@@ -189,6 +189,9 @@ OP (dec_pc)	{ _this -> Reg.PC --; }
 OP (clr_car)	{ _this -> Reg.Carry = false; }
 OP (clr_c)	{ _this -> Reg.C = false; }
 
+OP (set_car)	{ _this -> Reg.Carry = true; }
+OP (set_c)	{ _this -> Reg.C = true; }
+
 
 OP (subr)	{ IStor2_8 = (_this -> Reg.PC + 2) && 0xFF00; IStor3_8 = (_this -> Reg.PC + 2) & 0x00FF; }
 #undef OP
@@ -286,6 +289,43 @@ OP (CompM_Imm,	IMM16, &comp_m);
 OP (CompM_Abs,	ABS16, &comp_m);
 
 
+OP (AndA_Imm,	IMM, &and_a);
+OP (AndA_Abs,	ABS, &and_a);
+OP (AndB_Imm,	IMM, &and_b);
+OP (AndB_Abs,	ABS, &and_b);
+
+OP (XOrA_Imm,	IMM, &xor_a);
+OP (XOrA_Abs,	ABS, &xor_a);
+OP (XOrB_Imm,	IMM, &xor_b);
+OP (XOrB_Abs,	ABS, &xor_b);
+
+
+OP (OrA_Imm,	IMM, &or_a);
+OP (OrA_Abs,	ABS, &or_a);
+OP (OrB_Imm,	IMM, &or_b);
+OP (OrB_Abs,	ABS, &or_b);
+
+OP (NOrA_Imm,	IMM, &nor_a);
+OP (NOrA_Abs,	ABS, &nor_a);
+OP (NOrB_Imm,	IMM, &nor_b);
+OP (NOrB_Abs,	ABS, &nor_b);
+
+
+OP (IfZA_Rel,	IMM, &if0_a, &cond_rel);
+OP (IfZA_Adr,	IMM16, &if0_a, &cond_adr);
+OP (IfZB_Rel,	IMM, &if0_b, &cond_rel);
+OP (IfZB_Adr,	IMM16, &if0_b, &cond_adr);
+OP (IfC_Rel,	IMM, &if_c, &cond_rel);
+OP (IfC_Adr,	IMM16, &if_c, &cond_adr);
+
+OP (IfNZA_Rel,	IMM, &ifn0_a, &cond_rel);
+OP (IfNZA_Adr,	IMM16, &ifn0_a, &cond_adr);
+OP (IfNZB_Rel,	IMM, &ifn0_b, &cond_rel);
+OP (IfNZB_Adr,	IMM16, &ifn0_b, &cond_adr);
+OP (IfNC_Rel,	IMM, &ifn_c, &cond_rel);
+OP (IfNC_Adr,	IMM16, &ifn_c, &cond_adr);
+
+
 OP (LShA,	&lsh_a);
 OP (RShA,	&rsh_a);
 OP (LShB,	&lsh_b);
@@ -328,6 +368,33 @@ OP (DecPC,	&dec_pc);
 OP (Subr_Adr,	&subr, &nothing, PUSH16, IMM16, &jump_adr);
 OP (Subr_M,	&subr, &nothing, PUSH16, M16, &jump_adr);
 
+
+OP (MoveA_A,	&nothing);
+OP (MoveA_B,	&move_a_b);
+OP (MoveA_MA,	&move_a_ma);
+OP (MoveA_AM,	&move_a_am);
+
+OP (MoveB_A,	&move_b_a);
+OP (MoveB_A,	&nothing);
+OP (MoveB_BM,	&move_b_bm);
+OP (MoveB_MB,	&move_b_mb);
+
+OP (MoveAB_M,	&move_ab_m);
+OP (MoveBA_M,	&move_ba_m);
+OP (MoveM_AB,	&move_m_ab);
+OP (MoveM_BA,	&move_m_ba);
+
+
+OP (SetC,	&set_c);
+OP (SetCar,	&set_car);
+OP (ClearC,	&clr_c);
+OP (ClearCar,	&clr_car);
+
+
+OP (RetI,	&reti);
+OP (SetI,	IMM16, &seti); // reti, seti, spagheti
+OP (Int,	IMM, &prep_int);
+
 OP (NullOp,	&nothing);
 
 // OPCODES!!!! FINALLY!!!!
@@ -353,4 +420,80 @@ const SMP100::OpFunc SMP100::OpFuncs [] = {
 	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
 	
 	// 0x30 - 0x3F
+	OP (CompA_Imm),	OP (CompA_Abs),	OP (CompA_M),	OP (CompA_B),
+	OP (CompB_Imm),	OP (CompB_Abs),	OP (CompB_M),	OP (CompB_A),
+	OP (CompM_Imm),	OP (CompM_Abs),	OP (CompM_M),	OP (NullOp),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	
+	// 0x40 - 0x4F
+	OP (NullOp),	OP (StoreA_Adr),	OP (StoreA_M),	OP (NullOp),
+	OP (NullOp),	OP (StoreB_Adr),	OP (StoreB_M),	OP (NullOp),
+	OP (NullOp),	OP (StoreM_Adr),	OP (StoreM_M),	OP (NullOp),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	
+	// 0x50 - 0x5F
+	OP (AndA_Imm),	OP (AndA_Abs),	OP (XOrA_Imm),	OP (XOrA_Abs),
+	OP (AndB_Imm),	OP (AndB_Abs),	OP (XOrB_Imm),	OP (XOrB_Abs),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	
+	// 0x60 - 0x6F
+	OP (IfZA_Rel),	OP (IfZA_Adr),	OP (OrA_Imm),	OP (OrA_Abs),
+	OP (IfZB_Rel),	OP (IfZB_Adr),	OP (OrB_Imm),	OP (OrB_Abs),
+	OP (IfC_Rel),	OP (IfC_Adr),	OP (NullOp),	OP (NullOp),
+	OP (IfCar_Rel),	OP (IfCar_Adr),	OP (NullOp),	OP (NullOp),
+	
+	// 0x70 - 0x7F
+	OP (IfNZA_Rel),	OP (IfNZA_Adr),	OP (NOrA_Imm),	OP (NOrA_Abs),
+	OP (IfNZB_Rel),	OP (IfNZB_Adr),	OP (NOrB_Imm),	OP (NOrB_Abs),
+	OP (IfNC_Rel),	OP (IfNC_Adr),	OP (NullOp),	OP (NullOp),
+	OP (IfNCar_Rel),	OP (IfNCar_Adr),	OP (NullOp),	OP (NullOp),
+	
+	// 0x80 - 0x8F
+	OP (LShA),	OP (RShA),	OP (LRotA),	OP (RRotA),
+	OP (LShB),	OP (RShB),	OP (LRotB),	OP (RRotB),
+	OP (LShM),	OP (RShM),	OP (LRotM),	OP (RRotM),
+	OP (LShPC),	OP (RShPC),	OP (LRotPC),	OP (RRotPC),
+	
+	// 0x90 - 0x9F
+	OP (PushA),	OP (PullA),	OP (IncA),	OP (DecA),
+	OP (PushB),	OP (PullB),	OP (IncB),	OP (DecB),
+	OP (PushM),	OP (PullM),	OP (IncM),	OP (DecM),
+	OP (PushPC),	OP (PullPC),	OP (IncPC),	OP (DecPC),
+	
+	// 0xA0 - 0xAF
+	OP (MoveA_A),	OP (MoveA_B),	OP (MoveA_MA),	OP (MoveA_AM),
+	OP (MoveB_A),	OP (MoveB_B),	OP (MoveB_BM),	OP (MoveB_MB),
+	OP (MoveAB_M),	OP (MoveBA_M),	OP (MoveM_AB),	OP (MoveM_BA),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	
+	// 0xB0 - 0xBF
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	OP (SetC),	OP (SetC),	OP (NullOp),	OP (NullOp),
+	OP (SetCar),	OP (SetCar),	OP (NullOp),	OP (NullOp),
+	
+	// 0xC0 - 0xCF
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	OP (ClearC),	OP (ClearC),	OP (NullOp),	OP (NullOp),
+	OP (ClearCar),	OP (ClearCar),	OP (NullOp),	OP (NullOp),
+	
+	// 0xD0 - 0xDF
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	
+	// 0xE0 - 0xEF
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	
+	// 0xF0 - 0xFF
+	OP (NullOp),	OP (NullOp),	OP (RetI),	OP (SetI),
+	OP (Int),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (Break)
 };
