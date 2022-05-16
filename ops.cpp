@@ -1,3 +1,5 @@
+#include "cpu.hpp"
+
 #define OP(name) \
 	static void name (SMP100 *_this)
 #define IStor_8 \
@@ -14,7 +16,7 @@
 
 template <typename T>
 	T rotate_left (T val) {
-		return (val << 1) | ((val & (1 << (sizeof (T) * 8 - 1))) != 0);
+		return (val << 1) | ((val & ((T) 1 << (sizeof (T) * 8 - 1))) != 0);
 	}
 
 template <typename T>
@@ -29,43 +31,43 @@ template <typename T>
 
 template <typename T>
 	T rotate_right (T val, bool carry) {
-		return rotate_right <T> (val) | (carry << (sizeof (T) * 8 - 1));
+		return rotate_right <T> (val) | ((T) carry << (sizeof (T) * 8 - 1));
 	}
 
 
 OP (readnext) {
 	_this -> Bus = {
-		.RW = READ,
-		.addr = _this -> PC ++
+		.RW = RW_READ,
+		.addr = _this -> Reg.PC ++
 	};
 }
 
 OP (store_next) {
 	_this -> Reg.IStor = IStor_8;
 	_this -> Bus = {
-		.RW = READ,
-		.addr = _this -> PC ++
+		.RW = RW_READ,
+		.addr = _this -> Reg.PC ++
 	};
 }
 
 
 OP (readval) {
 	_this -> Bus = {
-		.RW = READ,
+		.RW = RW_READ,
 		.addr = IStor_16
 	};
 }
 
 OP (readval2) {
 	_this -> Reg.IStor = IStor_8;
-	_this -> Bus.RW = READ;
+	_this -> Bus.RW = RW_READ;
 	_this -> Bus.addr ++;
 }
 
 
 OP (readm) {
 	_this -> Bus = {
-		.RW = READ,
+		.RW = RW_READ,
 		.addr = _this -> Reg.M
 	};
 }
@@ -73,37 +75,37 @@ OP (readm) {
 
 OP (writeval) {
 	_this -> Bus = {
-		.RW = WRITE,
+		.RW = RW_WRITE,
 		.addr = IStor_16,
 		.word = IStor2_8
 	};
 }
 
 OP (writeval2) {
-	_this -> Bus.RW = WRITE;
+	_this -> Bus.RW = RW_WRITE;
 	_this -> Bus.word = IStor3_8;
 	_this -> Bus.addr ++;
 }
 
 
-OP (runopcode) { _this -> Operation = OpFuncs [_this -> Bus.Word] - 1; }
+OP (runopcode) { _this -> Operation = SMP100::OpFuncs [_this -> Bus.word] - 1; }
 
 
-OP (inc_stk)	{ _this -> Reg.StkCounter ++; }
-OP (dec_stk)	{ _this -> Reg.StkCounter --; }
+OP (inc_stk)	{ _this -> Reg.StackPtr ++; }
+OP (dec_stk)	{ _this -> Reg.StackPtr --; }
 
 OP (write_stk) {
 	_this -> Bus = {
-		.RW = WRITE,
-		.addr = _this -> Reg.StkCounter,
+		.RW = RW_WRITE,
+		.addr = _this -> Reg.StackPtr,
 		.word = IStor2_8
 	};
 }
 
 OP (write_stk2) {
 	_this -> Bus = {
-		.RW = WRITE,
-		.addr = _this -> Reg.StkCounter,
+		.RW = RW_WRITE,
+		.addr = _this -> Reg.StackPtr,
 		.word = IStor3_8
 	};
 }
@@ -111,18 +113,38 @@ OP (write_stk2) {
 
 OP (read_stk) {
 	_this -> Bus = {
-		.RW = READ,
-		.addr = _this -> Reg.StkCounter
+		.RW = RW_READ,
+		.addr = _this -> Reg.StackPtr
 	};
 }
 
 OP (read_stk2) {
-	IStor3_8 = IStor_8
+	IStor3_8 = IStor_8;
 	_this -> Bus = {
-		.RW = READ,
-		.addr = _this -> Reg.StkCounter
+		.RW = RW_READ,
+		.addr = _this -> Reg.StackPtr
 	};
 }
+
+
+OP (cond_rel) {
+	if (IStor2_8)
+		_this -> Reg.PC += IStor_8;
+}
+OP (cond_adr) {
+	if (IStor2_8)
+		_this -> Reg.PC = IStor_16;
+}
+
+OP (ncond_rel) {
+	if (IStor2_8 == false)
+		_this -> Reg.PC += IStor_8;
+}
+OP (ncond_adr) {
+	if (IStor2_8 == false)
+		_this -> Reg.PC = IStor_16;
+}
+
 
 OP (nothing) {}
 
@@ -192,6 +214,19 @@ OP (clr_c)	{ _this -> Reg.C = false; }
 OP (set_car)	{ _this -> Reg.Carry = true; }
 OP (set_c)	{ _this -> Reg.C = true; }
 
+OP (and_a)	{ _this -> Reg.A &= IStor_8; }
+OP (and_b)	{ _this -> Reg.B &= IStor_8; }
+OP (xor_a)	{ _this -> Reg.A ^= IStor_8; }
+OP (xor_b)	{ _this -> Reg.B ^= IStor_8; }
+OP (or_a)	{ _this -> Reg.A |= IStor_8; }
+OP (or_b)	{ _this -> Reg.B |= IStor_8; }
+OP (nor_a)	{ _this -> Reg.A |= ~ IStor_8; }
+OP (nor_b)	{ _this -> Reg.B |= ~ IStor_8; }
+
+OP (if0_a)	{ IStor2_8 = _this -> Reg.A == 0; }
+OP (if0_b)	{ IStor2_8 = _this -> Reg.B == 0; }
+OP (if_c)	{ IStor2_8 = _this -> Reg.C; }
+OP (if_car)	{ IStor2_8 = _this -> Reg.Carry; }
 
 OP (subr)	{ IStor2_8 = (_this -> Reg.PC + 2) && 0xFF00; IStor3_8 = (_this -> Reg.PC + 2) & 0x00FF; }
 #undef OP
@@ -287,6 +322,7 @@ OP (CompB_A,	&comp_b_a);
 
 OP (CompM_Imm,	IMM16, &comp_m);
 OP (CompM_Abs,	ABS16, &comp_m);
+OP (CompM_M,	M16, &comp_m);
 
 
 OP (AndA_Imm,	IMM, &and_a);
@@ -317,13 +353,18 @@ OP (IfZB_Rel,	IMM, &if0_b, &cond_rel);
 OP (IfZB_Adr,	IMM16, &if0_b, &cond_adr);
 OP (IfC_Rel,	IMM, &if_c, &cond_rel);
 OP (IfC_Adr,	IMM16, &if_c, &cond_adr);
+OP (IfCar_Rel,	IMM, &if_car, &cond_rel);
+OP (IfCar_Adr,	IMM16, &if_car, &cond_adr);
 
-OP (IfNZA_Rel,	IMM, &ifn0_a, &cond_rel);
-OP (IfNZA_Adr,	IMM16, &ifn0_a, &cond_adr);
-OP (IfNZB_Rel,	IMM, &ifn0_b, &cond_rel);
-OP (IfNZB_Adr,	IMM16, &ifn0_b, &cond_adr);
-OP (IfNC_Rel,	IMM, &ifn_c, &cond_rel);
-OP (IfNC_Adr,	IMM16, &ifn_c, &cond_adr);
+OP (IfNZA_Rel,	IMM, &if0_a, &ncond_rel);
+OP (IfNZA_Adr,	IMM16, &if0_a, &ncond_adr);
+OP (IfNZB_Rel,	IMM, &if0_b, &ncond_rel);
+OP (IfNZB_Adr,	IMM16, &if0_b, &ncond_adr);
+OP (IfNC_Rel,	IMM, &if_c, &ncond_rel);
+OP (IfNC_Adr,	IMM16, &if_c, &ncond_adr);
+OP (IfNCar_Rel,	IMM, &if_car, &ncond_rel);
+OP (IfNCar_Adr,	IMM16, &if_car, &ncond_adr);
+
 
 
 OP (LShA,	&lsh_a);
@@ -375,7 +416,7 @@ OP (MoveA_MA,	&move_a_ma);
 OP (MoveA_AM,	&move_a_am);
 
 OP (MoveB_A,	&move_b_a);
-OP (MoveB_A,	&nothing);
+OP (MoveB_B,	&nothing);
 OP (MoveB_BM,	&move_b_bm);
 OP (MoveB_MB,	&move_b_mb);
 
@@ -399,24 +440,24 @@ OP (NullOp,	&nothing);
 
 // OPCODES!!!! FINALLY!!!!
 #undef OP
-#define OP(name)	&OpFunc_ ## name
-const SMP100::OpFunc SMP100::OpFuncs [] = {
+#define OP(name)	OpFunc_ ## name
+const SMP100::OpFunc *SMP100::OpFuncs [] = {
 	// 0x00 - 0x0F
 	OP (LoadA_Imm),	OP (LoadA_Abs),	OP (LoadA_M),	OP (NullOp),
 	OP (LoadB_Imm),	OP (LoadB_Abs),	OP (LoadB_M),	OP (NullOp),
 	OP (LoadM_Imm),	OP (LoadM_Abs),	OP (LoadM_M),	OP (NullOp),
-	OP (Jump_Rel),	OP (Jump_Abs),	OP (Jump_M),	OP (NullOp),
+	OP (Jump_Rel),	OP (Jump_Adr),	OP (Jump_M),	OP (NullOp),
 	
 	// 0x10 - 0x1F
 	OP (AddA_Imm),	OP (AddA_Abs),	OP (AddA_M),	OP (AddA_B),
 	OP (AddB_Imm),	OP (AddB_Abs),	OP (AddB_M),	OP (AddB_A),
-	OP (AddM_Imm),	OP (AddM_Abs),	OP (AddM_M),	OP (AddM_AB),
+	OP (AddM_Imm),	OP (AddM_Abs),	OP (AddM_M),	OP (NullOp),
 	OP (NullOp),	OP (Subr_Adr),	OP (Subr_M),	OP (NullOp),
 	
 	// 0x20 - 0x2F
 	OP (SubA_Imm),	OP (SubA_Abs),	OP (SubA_M),	OP (SubA_B),
 	OP (SubB_Imm),	OP (SubB_Abs),	OP (SubB_M),	OP (SubB_A),
-	OP (SubM_Imm),	OP (SubM_Abs),	OP (SubM_M),	OP (SubM_AB),
+	OP (SubM_Imm),	OP (SubM_Abs),	OP (SubM_M),	OP (NullOp),
 	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
 	
 	// 0x30 - 0x3F
@@ -495,5 +536,5 @@ const SMP100::OpFunc SMP100::OpFuncs [] = {
 	OP (NullOp),	OP (NullOp),	OP (RetI),	OP (SetI),
 	OP (Int),	OP (NullOp),	OP (NullOp),	OP (NullOp),
 	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
-	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (Break)
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp)
 };

@@ -1,15 +1,16 @@
 #include <stdint.h>
-#define READ 1
-#define WRITE 0
+#include <stdlib.h>
+#define RW_READ 1
+#define RW_WRITE 0
 typedef uint_fast16_t Address;
 typedef uint_fast8_t Word;
 class SMP100 {
 	
 	public:
 		struct Pair {
-			Address addr;
-			Word byte;
 			bool RW;
+			Address addr;
+			Word word;
 		};
 		
 		struct Pair Bus;
@@ -36,37 +37,7 @@ class SMP100 {
 		} Reg;
 		
 		typedef void (* OpFunc) (SMP100 *);
-		OpFunc Operation == NULL;
+		const OpFunc *Operation = NULL;
 		
-		extern const OpFunc OpFuncs [];
-		OpFunc LastOpFunc;
+		static const OpFunc *OpFuncs [];
 };
-	
-
-void SMP100::Cycle (void) {
-	if (++ Operation == NULL)
-		Operation = &Op_BeginCycle;
-	
-	Operation (this);
-	
-	if (Reg.A > 0xFF) {
-		Reg.A &= 0xFF;
-		Reg.Carry |= true;
-	}
-	if (Reg.B > 0xFF) {
-		Reg.B &= 0xFF;
-		Reg.Carry |= true;
-	}
-	if (Reg.M > 0xFFFF) {
-		Reg.M &= 0xFFFF;
-		Reg.Carry |= true;
-	}
-	if (Reg.PC > 0xFFFF) {
-		Reg.PC &= 0xFFFF;
-		Reg.Carry |= true;
-	}
-	if (Reg.StackPtr > 0xFF) {
-		Reg.StackPtr &= 0xFF;
-		Reg.Carry |= true;
-	}
-}
