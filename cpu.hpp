@@ -29,11 +29,13 @@ class SMP100 {
 			
 			bool Carry;
 			uint_fast32_t PC;
-			uint_fast16_t IntRet;
 			uint_fast8_t StackPtr;
 			
 			uint_fast8_t IStor;
 			uint_fast16_t IStor2;
+			
+			uint_fast16_t Ints [16];
+			uint_fast16_t IntRet;
 		} Reg;
 		
 		typedef void (* OpFunc) (SMP100 *);

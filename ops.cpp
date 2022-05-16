@@ -5,12 +5,12 @@
 #define IStor_8 \
 	_this -> Bus.word
 #define IStor_16 \
-	((IStor_8 << 8) | IStor3_8)
+	((uint_fast16_t) ((IStor_8 << 8) | IStor3_8))
 
 #define IStor2_8 \
 	_this -> Reg.IStor2
 #define IStor2_16 \
-	((IStor2_8 << 8) | IStor3_8)
+	((uint_fast16_t) ((IStor2_8 << 8) | IStor3_8))
 #define IStor3_8 \
 	_this -> Reg.IStor
 
@@ -38,7 +38,7 @@ template <typename T>
 OP (readnext) {
 	_this -> Bus = {
 		.RW = RW_READ,
-		.addr = _this -> Reg.PC ++
+		.addr = (Address) _this -> Reg.PC ++
 	};
 }
 
@@ -46,7 +46,7 @@ OP (store_next) {
 	_this -> Reg.IStor = IStor_8;
 	_this -> Bus = {
 		.RW = RW_READ,
-		.addr = _this -> Reg.PC ++
+		.addr = (Address) _this -> Reg.PC ++
 	};
 }
 
@@ -54,7 +54,7 @@ OP (store_next) {
 OP (readval) {
 	_this -> Bus = {
 		.RW = RW_READ,
-		.addr = IStor_16
+		.addr = (Address) IStor_16
 	};
 }
 
@@ -68,7 +68,7 @@ OP (readval2) {
 OP (readm) {
 	_this -> Bus = {
 		.RW = RW_READ,
-		.addr = _this -> Reg.M
+		.addr = (Address) _this -> Reg.M
 	};
 }
 
@@ -76,8 +76,8 @@ OP (readm) {
 OP (writeval) {
 	_this -> Bus = {
 		.RW = RW_WRITE,
-		.addr = IStor_16,
-		.word = IStor2_8
+		.addr = (Address) IStor_16,
+		.word = (Word) IStor2_8
 	};
 }
 
@@ -97,16 +97,16 @@ OP (dec_stk)	{ _this -> Reg.StackPtr --; }
 OP (write_stk) {
 	_this -> Bus = {
 		.RW = RW_WRITE,
-		.addr = _this -> Reg.StackPtr,
-		.word = IStor2_8
+		.addr = (Address) _this -> Reg.StackPtr,
+		.word = (Word) IStor2_8
 	};
 }
 
 OP (write_stk2) {
 	_this -> Bus = {
 		.RW = RW_WRITE,
-		.addr = _this -> Reg.StackPtr,
-		.word = IStor3_8
+		.addr = (Address) _this -> Reg.StackPtr,
+		.word = (Word) IStor3_8
 	};
 }
 
@@ -114,7 +114,7 @@ OP (write_stk2) {
 OP (read_stk) {
 	_this -> Bus = {
 		.RW = RW_READ,
-		.addr = _this -> Reg.StackPtr
+		.addr = (Address) _this -> Reg.StackPtr
 	};
 }
 
@@ -122,7 +122,7 @@ OP (read_stk2) {
 	IStor3_8 = IStor_8;
 	_this -> Bus = {
 		.RW = RW_READ,
-		.addr = _this -> Reg.StackPtr
+		.addr = (Address) _this -> Reg.StackPtr
 	};
 }
 
@@ -145,6 +145,11 @@ OP (ncond_adr) {
 		_this -> Reg.PC = IStor_16;
 }
 
+
+OP (prep_int) {
+	_this -> Reg.IntRet = _this -> Reg.PC;
+	_this -> Reg.PC = _this -> Reg.Ints [IStor_8 & 0x0F];
+}
 
 OP (nothing) {}
 
@@ -229,6 +234,21 @@ OP (if_c)	{ IStor2_8 = _this -> Reg.C; }
 OP (if_car)	{ IStor2_8 = _this -> Reg.Carry; }
 
 OP (subr)	{ IStor2_8 = (_this -> Reg.PC + 2) && 0xFF00; IStor3_8 = (_this -> Reg.PC + 2) & 0x00FF; }
+
+OP (reti)	{ _this -> Reg.PC = _this -> Reg.IntRet; }
+OP (seti)	{ _this -> Reg.Ints [IStor_8 & 0x0F] = _this -> Reg.M; }
+
+OP (move_a_b)	{ _this -> Reg.B = _this -> Reg.A; }
+OP (move_b_a)	{ _this -> Reg.A = _this -> Reg.B; }
+OP (move_a_ma)	{ _this -> Reg.M = (_this -> Reg.M & 0xFF00) | _this -> Reg.A; }
+OP (move_b_mb)	{ _this -> Reg.M = (_this -> Reg.M & 0xFF00) | _this -> Reg.B; }
+OP (move_a_am)	{ _this -> Reg.M = (_this -> Reg.M & 0x00FF) | (_this -> Reg.A << 8); }
+OP (move_b_bm)	{ _this -> Reg.M = (_this -> Reg.M & 0x00FF) | (_this -> Reg.B << 8); }
+OP (move_m_ab)	{ _this -> Reg.A = (_this -> Reg.M & 0xFF00) >> 8; _this -> Reg.B = _this -> Reg.M & 0x00FF; }
+OP (move_m_ba)	{ _this -> Reg.B = (_this -> Reg.M & 0xFF00) >> 8; _this -> Reg.A = _this -> Reg.M & 0x00FF; }
+OP (move_ab_m)	{ _this -> Reg.M = (_this -> Reg.A << 8) | _this -> Reg.B; }
+OP (move_ba_m)	{ _this -> Reg.M = (_this -> Reg.B << 8) | _this -> Reg.A; }
+
 #undef OP
 #define OP(name, ...) \
 	const SMP100::OpFunc OpFunc_ ## name [] = { __VA_ARGS__, NULL };
