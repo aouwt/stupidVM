@@ -193,7 +193,7 @@ OP (clr_c)	{ _this -> Reg.C = false; }
 OP (subr)	{ IStor2_8 = (_this -> Reg.PC + 2) && 0xFF00; IStor3_8 = (_this -> Reg.PC + 2) & 0x00FF; }
 #undef OP
 #define OP(name, ...) \
-	const OpFunc_ ## name [] = { __VA_ARGS__, NULL };
+	const SMP100::OpFunc OpFunc_ ## name [] = { __VA_ARGS__, NULL };
 
 #define IMM	&readnext
 #define ABS	&readnext, &store_next, &readval
@@ -328,6 +328,29 @@ OP (DecPC,	&dec_pc);
 OP (Subr_Adr,	&subr, &nothing, PUSH16, IMM16, &jump_adr);
 OP (Subr_M,	&subr, &nothing, PUSH16, M16, &jump_adr);
 
+OP (NullOp,	&nothing);
 
-
-
+// OPCODES!!!! FINALLY!!!!
+#undef OP
+#define OP(name)	&OpFunc_ ## name
+const SMP100::OpFunc SMP100::OpFuncs [] = {
+	// 0x00 - 0x0F
+	OP (LoadA_Imm),	OP (LoadA_Abs),	OP (LoadA_M),	OP (NullOp),
+	OP (LoadB_Imm),	OP (LoadB_Abs),	OP (LoadB_M),	OP (NullOp),
+	OP (LoadM_Imm),	OP (LoadM_Abs),	OP (LoadM_M),	OP (NullOp),
+	OP (Jump_Rel),	OP (Jump_Abs),	OP (Jump_M),	OP (NullOp),
+	
+	// 0x10 - 0x1F
+	OP (AddA_Imm),	OP (AddA_Abs),	OP (AddA_M),	OP (AddA_B),
+	OP (AddB_Imm),	OP (AddB_Abs),	OP (AddB_M),	OP (AddB_A),
+	OP (AddM_Imm),	OP (AddM_Abs),	OP (AddM_M),	OP (AddM_AB),
+	OP (NullOp),	OP (Subr_Adr),	OP (Subr_M),	OP (NullOp),
+	
+	// 0x20 - 0x2F
+	OP (SubA_Imm),	OP (SubA_Abs),	OP (SubA_M),	OP (SubA_B),
+	OP (SubB_Imm),	OP (SubB_Abs),	OP (SubB_M),	OP (SubB_A),
+	OP (SubM_Imm),	OP (SubM_Abs),	OP (SubM_M),	OP (SubM_AB),
+	OP (NullOp),	OP (NullOp),	OP (NullOp),	OP (NullOp),
+	
+	// 0x30 - 0x3F
+};

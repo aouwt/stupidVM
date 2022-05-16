@@ -38,7 +38,7 @@ class SMP100 {
 		typedef void (* OpFunc) (SMP100 *);
 		OpFunc Operation == NULL;
 		
-		static const OpFunc OpFuncs [];
+		extern const OpFunc OpFuncs [];
 		OpFunc LastOpFunc;
 };
 	
