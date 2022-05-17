@@ -1,10 +1,9 @@
-	
-
+#include "cpu.hpp"
 void SMP100::Cycle (void) {
 	if (++ Operation == NULL)
-		Operation = &Op_BeginCycle;
+		Operation = Op_BeginCycle;
 	
-	Operation (this);
+	(*Operation) (NULL);
 	
 	if (Reg.A > 0xFF) {
 		Reg.A &= 0xFF;
@@ -22,8 +21,8 @@ void SMP100::Cycle (void) {
 		Reg.PC &= 0xFFFF;
 		Reg.Carry |= true;
 	}
-	if (Reg.StackPtr > 0xFF) {
-		Reg.StackPtr &= 0xFF;
-		Reg.Carry |= true;
-	}
+}
+
+void SMP100::SignalInt (short ID) {
+	NextInt = ID;
 }

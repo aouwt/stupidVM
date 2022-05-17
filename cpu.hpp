@@ -38,8 +38,16 @@ class SMP100 {
 			uint_fast16_t IntRet;
 		} Reg;
 		
+		struct {
+			uint_fast16_t Reset;
+			uint_fast16_t StackBegin;
+		} HWReg;
+		
+		int_fast8_t NextInt = -1;
 		typedef void (* OpFunc) (SMP100 *);
 		const OpFunc *Operation = NULL;
 		
-		static const OpFunc *OpFuncs [];
+		static const OpFunc *Opcodes [];
+		static const OpFunc Op_Reset [];
+		static const OpFunc Op_BeginCycle [];
 };
