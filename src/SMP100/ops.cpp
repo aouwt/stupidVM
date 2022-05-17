@@ -1,4 +1,4 @@
-#include "cpu.hpp"
+#include "SMP100.hpp"
 
 #define OP(name) \
 	static void name (SMP100 *_this)

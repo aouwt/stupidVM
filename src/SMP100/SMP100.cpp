@@ -1,9 +1,9 @@
-#include "cpu.hpp"
+#include "SMP100.hpp"
 void SMP100::Cycle (void) {
-	if (++ Operation == NULL)
+	if (*(++ Operation) == NULL)
 		Operation = Op_BeginCycle;
 	
-	(*Operation) (NULL);
+	(*Operation) (this);
 	
 	if (Reg.A > 0xFF) {
 		Reg.A &= 0xFF;
@@ -25,4 +25,8 @@ void SMP100::Cycle (void) {
 
 void SMP100::SignalInt (short ID) {
 	NextInt = ID;
+}
+
+void SMP100::SignalReset (void) {
+	//Operation = Op_Reset;
 }
