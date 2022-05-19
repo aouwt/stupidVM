@@ -5,42 +5,44 @@
 	class SMP100 {
 		
 		public:
-			struct Pair Bus;
+			struct Pair Bus;	// Address and data bus. Important to check this after every call to Cycle ()!
 			
-			struct {
+			struct {	// Hardware registers, for aiding in the description of the CPU's behavior. Usually set with the constructor, but can be set afterwards too.
 				Address Reset;
 				Address StackBegin;
 			} HWReg;
 			
-			SMP100 (Address Reset, Address StackBegin) {
+			SMP100 (Address Reset, Address StackBegin) {	// constructor
 				HWReg.Reset = Reset;
 				HWReg.StackBegin = StackBegin;
 			}
 			
-			void SignalInt (short ID);
-			void SignalReset (void);
+			void SignalInt (U8 ID);	// Signals interrupt (to run when op is finished)
+			void SignalReset (void);	// Signals reset (forces to run next time Cycle () is called)
 			
-			void Cycle (void);
+			void Cycle (void);	// Runs next pending operation for CPU emulation. Make sure to check the bus for addressing!
+			
+			
 			
 			// "private" (needed public for the callbacks and stuff)
 			struct {
-				uint_fast16_t A;
-				uint_fast16_t B;
+				U16 A;
+				U16 B;
 				bool C;
-				uint_fast32_t M;
+				U32 M;
 				
 				bool Carry;
-				uint_fast32_t PC;
-				uint_fast8_t StackPtr;
+				U32 PC;
+				U8 StackPtr;
 				
-				uint_fast8_t IStor;
-				uint_fast16_t IStor2;
+				U8 IStor;
+				U8 IStor2;
 				
-				uint_fast16_t Ints [16];
-				uint_fast16_t IntRet;
+				U16 Ints [16];
+				U16 IntRet;
 			} Reg;
 			
-			int_fast8_t NextInt = -1;
+			S8 NextInt = -1;
 			typedef void (* OpFunc) (SMP100 *);
 			
 			static const OpFunc *Opcodes [];

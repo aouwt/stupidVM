@@ -23,7 +23,7 @@ void SMP100::Cycle (void) {
 	}
 }
 
-void SMP100::SignalInt (short ID) {
+void SMP100::SignalInt (U8 ID) {
 	NextInt = ID;
 }
 
