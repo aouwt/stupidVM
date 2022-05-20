@@ -9,6 +9,9 @@ static SDL_AudioSpec DefaultAS = {
 	
 };
 
+
+static struct SAC110::Sample Waveforms [256];
+
 void callback (void *udat, uint8_t *stream, int len) {
 	SAC110 *_this = (SAC110 *) udat;
 	for (int i = 0; i != len; i ++) {
@@ -30,12 +33,24 @@ void callback (void *udat, uint8_t *stream, int len) {
 }
 
 void SAC110::PeripheralFunc (PeripheralBus *bus) {
+	static Word Regs [16];
+	
 	if (bus -> RW == RW_WRITE) {
-		switch (bus -> addr) {
-			case 0x0:
+		Regs [bus -> addr] = bus -> word;
+		
+		if ((bus -> addr & 0x03) == 3) { // write to volume byte to push change
+			U8 ch = (bus -> addr & 0xC) >> 2; // get top 2 bits
 			
+			Chs [ch].Samp = &Waveforms [Regs [ch + 2]];
+			Chs [ch].Amp = Regs [ch + 3] / 256.0;
+			Chs [ch].SampTime =
+				(AudSpec.freq / // convert to samples
+					(Regs [ch + 0] & (Regs [ch + 1] << 8)) // get frequency
+				) / Chs [ch].Samp -> Len // convert to samptime
+			;
 		}
-	}
+	} else
+		bus -> word = Regs [bus -> addr];
 }
 
 SAC110::SAC110 (SDL_AudioSpec *Spec) {

@@ -14,8 +14,6 @@
 				U8 Dat [256];
 			};
 			
-			static const struct Sample Waveforms [4];
-			
 			struct Channel {
 				U16 SampTime = 0;
 				U16 ToNext = 0;
