@@ -3,17 +3,24 @@
 
 #include "stupidVM.hpp"
 #include "periphial.hpp"
-#include "SAC110.hpp"
+#include "SAC120.hpp"
+
+void callback (void *udat, uint8_t *stream, int len);
 
 static SDL_AudioSpec DefaultAS = {
-	
+	.freq = 44100,
+	.format = AUDIO_U8,
+	.samples = 512,
+	.callback = &callback,
+	.userdata = NULL
 };
 
+static struct SAC120::Sample Waveforms [256];
 
-static struct SAC110::Sample Waveforms [256];
+
 
 void callback (void *udat, uint8_t *stream, int len) {
-	SAC110 *_this = (SAC110 *) udat;
+	SAC120 *_this = (SAC120 *) udat;
 	for (int i = 0; i != len; i ++) {
 	
 		stream [i] = 0;
@@ -32,7 +39,7 @@ void callback (void *udat, uint8_t *stream, int len) {
 	}
 }
 
-void SAC110::PeripheralFunc (PeripheralBus *bus) {
+void SAC120::PeripheralFunc (PeripheralBus *bus) {
 	static Word Regs [16];
 	
 	if (bus -> RW == RW_WRITE) {
@@ -53,7 +60,7 @@ void SAC110::PeripheralFunc (PeripheralBus *bus) {
 		bus -> word = Regs [bus -> addr];
 }
 
-SAC110::SAC110 (SDL_AudioSpec *Spec) {
+SAC120::SAC120 (SDL_AudioSpec *Spec) {
 	SDL_Init (SDL_INIT_AUDIO);
 	if (Spec == NULL)
 		Spec = &DefaultAS;
@@ -65,4 +72,8 @@ SAC110::SAC110 (SDL_AudioSpec *Spec) {
 	request.userdata = (void *) this;
 	
 	SDL_OpenAudio (&request, &AudSpec);
+}
+
+SAC120::~SAC120 (void) {
+	SDL_CloseAudio ();
 }

@@ -7,7 +7,7 @@
 	#include "stupidVM.hpp"
 	#include "periphial.hpp"
 	
-	class SAC110 {
+	class SAC120 {
 		public:
 			struct Sample {
 				U16 Len = 256;
@@ -23,7 +23,9 @@
 			};
 			struct Channel Chs [4];
 			
-			SAC110 (SDL_AudioSpec *Spec);
+			SAC120 (SDL_AudioSpec *Spec);
+			SAC120 (void) { SAC120 (NULL); }
+			~SAC120 (void);
 			
 			SDL_AudioSpec AudSpec;
 			void PeripheralFunc (PeripheralBus *Bus);
