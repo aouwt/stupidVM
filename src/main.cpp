@@ -1,5 +1,5 @@
 #include "SMP100.hpp"
-#include "periphial.hpp"
+#include "peripheral.hpp"
 #include <stdio.h>
 
 PeripheralFunc Peripherals [16];

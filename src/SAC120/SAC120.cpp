@@ -2,7 +2,7 @@
 #include <SDL_audio.h>
 
 #include "stupidVM.hpp"
-#include "periphial.hpp"
+#include "peripheral.hpp"
 #include "SAC120.hpp"
 
 void callback (void *udat, uint8_t *stream, int len);

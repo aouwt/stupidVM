@@ -5,7 +5,7 @@
 	#include <SDL_audio.h>
 	
 	#include "stupidVM.hpp"
-	#include "periphial.hpp"
+	#include "peripheral.hpp"
 	
 	class SAC120 {
 		public:

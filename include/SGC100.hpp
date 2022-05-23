@@ -2,7 +2,7 @@
 	#define SGC100_HPP
 	
 	#include "stupidVM.hpp"
-	#include "periphial.hpp"
+	#include "peripheral.hpp"
 	
 	
 #endif

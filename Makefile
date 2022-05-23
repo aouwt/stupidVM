@@ -1,35 +1,27 @@
-MAKE_O=-r -no-pie -I./include
-COPTS=-Ofast -std=c++20 -Wall -Wextra -Wpedantic
+MAKE_O=cc ${COPTS} ${CPP} -r -no-pie -o $@
+
+COPTS=-Ofast -std=c++20 -Wall -Wextra -Wpedantic -I./include
 CPP=-x c++
 
-SDL2_OPTS=$(shell sdl2-config --cflags)
-SDL2_AUDIO_OPTS=${SDL2_OPTS}
+SDL2=$(shell sdl2-config --cflags)
+SDL2_AUDIO=${SDL2}
+SDL2_THREAD=${SDL2}
 
-./stupidVM: ./obj/main.o ./obj/SMP100.o
+./stupidVM: ./obj ./obj/main.o ./obj/SMP100.o
 	cc ${COPTS} ./obj/*.o -o ./stupidVM
+
 
 ./obj:
 	mkdir obj
 
-./obj/main.o: ./obj
-	cc ${COPTS} ${MAKE_O} ./src/main.cpp -o ./obj/main.o
+./obj/main.o:	./obj; ${MAKE_O} ./src/*.cpp
 
-./obj/SMP100.o: ./src/SMP100/SMP100.o ./src/SMP100/ops.o ./obj
-	cc ${COPTS} ${MAKE_O} ./src/SMP100/SMP100.o ./src/SMP100/ops.o -o ./obj/SMP100.o
+./obj/SMP100.o:	./obj; ${MAKE_O} ${SDL2_THREAD} ./src/SMP100/*.cpp
+./obj/SAC120.o:	./obj; ${MAKE_O} ${SDL2_AUDIO} ./src/SMP120/*.cpp
+./obj/SGC100.o:	./obj; ${MAKE_O} ${SDL2} ./src/SGC100/*.cpp
 
-./src/SMP100/SMP100.o:
-	cc ${COPTS} ${MAKE_O} ${CPP} ./src/SMP100/SMP100.cpp -o ./src/SMP100/SMP100.o
-
-./src/SMP100/ops.o:
-	cc ${COPTS} ${MAKE_O} ${CPP} ./src/SMP100/ops.cpp -o ./src/SMP100/ops.o
-
-./src/SAC120/SAC120.o:
-	cc ${COPTS} ${SDL2_AUDIO_OPTS} ${MAKE_O} ${CPP} ./src/SAC120/SAC120.cpp -o ./src/SAC120/SAC120.o
-
-./obj/SAC120.o: ./src/SAC120/SAC120.o ./obj
-	cc ${COPTS} ${SDL2_AUDIO_OPTS} ${MAKE_O} ./src/SAC120/SAC120.o -o ./obj/SAC120.o
 
 clean:
-	rm -rf ./obj ./src/*.o ./src/*/*.o
+	rm -rf ./obj
 
 .PHONY: clean
