@@ -7,8 +7,10 @@ SDL2=$(shell sdl2-config --cflags)
 SDL2_AUDIO=${SDL2}
 SDL2_THREAD=${SDL2}
 
-./stupidVM: ./obj ./obj/main.o ./obj/SMP100.o
-	cc ${COPTS} ./obj/*.o -o ./stupidVM
+DEPS=-lstdc++ $(shell sdl2-config --libs)
+
+./stupidVM: ./obj/main.o ./obj/SMP100.o ./obj/SAC120.o ./obj/SGC100.o ./obj/stupidVM.o
+	cc $^ ${DEPS} -o ./stupidVM
 
 
 ./obj:
@@ -17,9 +19,9 @@ SDL2_THREAD=${SDL2}
 ./obj/main.o:	./obj; ${MAKE_O} ./src/*.cpp
 
 ./obj/SMP100.o:	./obj; ${MAKE_O} ${SDL2_THREAD} ./src/SMP100/*.cpp
-./obj/SAC120.o:	./obj; ${MAKE_O} ${SDL2_AUDIO} ./src/SMP120/*.cpp
+./obj/SAC120.o:	./obj; ${MAKE_O} ${SDL2_AUDIO} ./src/SAC120/*.cpp
 ./obj/SGC100.o:	./obj; ${MAKE_O} ${SDL2} ./src/SGC100/*.cpp
-
+./obj/stupidVM.o:	./obj; ${MAKE_O} ${SDL2} ./src/stupidVM/*.cpp
 
 clean:
 	rm -rf ./obj

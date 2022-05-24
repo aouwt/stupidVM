@@ -5,14 +5,12 @@
 	
 	class Timer {
 		public:
-			Timer (U16 Hz);
-			~Timer (void);
+			Timer (float Hz);
 			
 			void Wait (void);
+			bool IsLate (void);
 			
 		private:
 			U16 Interval;
-			
-			U32 LastTime = 0;
 	};
 #endif
