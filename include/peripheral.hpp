@@ -11,5 +11,12 @@
 		Word word;
 	};
 	
-	typedef void (* PeripheralFunc) (struct PeripheralBus *);
+	typedef 
+	struct Peripheral {
+		PeripheralBus Bus;
+		void (* Constructor) (void);
+		void (* Destructor) (void);
+		void (* IO) (void);
+		void (* OnInt) (U8 Int);
+	};
 #endif

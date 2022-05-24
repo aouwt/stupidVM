@@ -1,6 +1,6 @@
 MAKE_O=cc ${COPTS} ${CPP} -r -no-pie -o $@
 
-COPTS=-Ofast -std=c++20 -Wall -Wextra -Wpedantic -I./include
+COPTS=-funroll-loops -funroll-all-loops -Ofast -march=native -mtune=native -std=c++20 -Wall -Wextra -Wpedantic -I./include
 CPP=-x c++
 
 SDL2=$(shell sdl2-config --cflags)
@@ -10,11 +10,11 @@ SDL2_THREAD=${SDL2}
 DEPS=-lstdc++ $(shell sdl2-config --libs)
 
 ./stupidVM: ./obj/main.o ./obj/SMP100.o ./obj/SAC120.o ./obj/SGC100.o ./obj/stupidVM.o
-	cc $^ ${DEPS} -o ./stupidVM
+	cc ${COPTS} $^ ${DEPS} -o ./stupidVM
 
 
 ./obj:
-	mkdir obj
+	mkdir obj -p
 
 ./obj/main.o:	./obj; ${MAKE_O} ./src/*.cpp
 

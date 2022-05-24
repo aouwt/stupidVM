@@ -1,16 +1,19 @@
-#include <SDL.h>
+#include <sys/time.h>
+#include <unistd.h>
 #include "stupidVM_SDL.hpp"
 
 Timer::Timer (float Hz) {
-	Interval = 1000.0 / Hz;
+	Interval = (1000000.0 / Hz);
 }
 
 void Timer::Wait (void) {
-	static U32 target = 0;
-	U32 now = SDL_GetTicks ();
+	struct timeval tv;
+	gettimeofday (&tv, NULL);
 	
-	if (target > now)
-		SDL_Delay (target - now);
+	U64 now = tv.tv_sec * 1000000LU + tv.tv_usec;
 	
-	target = now + Interval;
+	if (Target > now)
+		usleep (Target - now);
+	
+	Target = now + Interval;
 }

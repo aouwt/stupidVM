@@ -1,16 +1,17 @@
 #include "SMP100.hpp"
+#include <stdio.h>
 
 #define OP(name) \
 	static void name (SMP100 *_this)
 #define IStor_8 \
 	_this -> Bus.word
 #define IStor_16 \
-	((uint_fast16_t) ((IStor_8 << 8) | IStor3_8))
+	((IStor_8 << 8) | IStor3_8)
 
 #define IStor2_8 \
 	_this -> Reg.IStor2
 #define IStor2_16 \
-	((uint_fast16_t) ((IStor2_8 << 8) | IStor3_8))
+	((IStor2_8 << 8) | IStor3_8)
 #define IStor3_8 \
 	_this -> Reg.IStor
 
@@ -89,8 +90,13 @@ OP (writeval2) {
 
 
 OP (runopcode) {
-	_this -> Reg.PC = _this -> Reg.Ints [_this -> NextInt];
-	_this -> NextInt = -1;
+	if (_this -> NextInt != -1) {
+		_this -> Reg.PC = _this -> Reg.Ints [_this -> NextInt];
+		_this -> NextInt = -1;
+		_this -> Operation = &SMP100::Op_BeginCycle [-1];
+	}
+	
+//	fprintf (stderr, "OP: %hu @ %hu\n", (unsigned int) _this -> Bus.word, (unsigned int) _this -> Reg.PC);
 	_this -> Operation = &SMP100::Opcodes [_this -> Bus.word] [-1];
 }
 

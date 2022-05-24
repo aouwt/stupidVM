@@ -1,6 +1,8 @@
 #ifndef STUPIDVM_SDL_HPP
 	#define STUPIDVM_SDL_HPP
 	
+	#include <unistd.h>
+	
 	#include "stupidVM.hpp"
 	
 	class Timer {
@@ -11,6 +13,6 @@
 			bool IsLate (void);
 			
 		private:
-			U16 Interval;
+			U64 Interval, Target = 0;
 	};
 #endif
