@@ -5,17 +5,18 @@
 	#include <SDL_mutex.h>
 	
 	#include "stupidVM.hpp"
-	#include "stupidVM_SDL.hpp"
-	#include "peripheral.hpp"
+	#include "stupidVM_Supp.hpp"
+	#include "Peripheral.hpp"
 	#include "SMP100.hpp"
 	
 	class SMP100c {
 		public:
 			SMP100c (U16 ClockRate, U16 RAM);
+			SMP100c (void);
 			~SMP100c (void);
-			void PeripheralFunc (PeripheralBus *bus);
+		
 			
-			//"private"
+			// "private":
 			SMP100 *SMP;
 			SDL_Thread *Thread;
 			SDL_mutex *Halt;
@@ -23,5 +24,8 @@
 			U8 *RAM;
 			Timer *timer;
 			bool CleanupSig = false;
+			bool IsHalted;
+			
+			static const Peripheral::PeripheralInfo PeripheralInfo;
 	};
 #endif

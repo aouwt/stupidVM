@@ -1,11 +1,11 @@
 #include "SMP100.hpp"
-#include "peripheral.hpp"
-#include "stupidVM_SDL.hpp"
+#include "Peripheral.hpp"
+#include "stupidVM_Supp.hpp"
 #include <stdio.h>
 
-static PeripheralFunc_IO Peripherals [16];
 
 static SMP100 *CPU;
+static Peipheral *Peripherals;
 
 namespace Memories {
 	Word ASpace [0xFFFF];
@@ -35,16 +35,7 @@ void cycle (void) {
 			READ (Memories::ASpace);
 	} else
 	if (addr >= 0xFF00) {	// Peripheral
-		U8 p = ((addr & 0x00F0) >> 4);
-		if (Peripherals [p] != NULL) {
-			PeripheralBus bus = {
-				.RW = CPU -> Bus.RW,
-				.addr = (U8) (CPU -> Bus.addr & 0x000F),
-				.word = CPU -> Bus.word
-			};
-			(Peripherals [p]) (&bus); // call func
-			CPU -> Bus.word = bus.word;
-		}
+		Peripherals -> BusAction (addr & 0x00FF
 	} else {	// SRAM
 		if (CPU -> Bus.RW == RW_READ)
 			READ (Memories::ASpace);

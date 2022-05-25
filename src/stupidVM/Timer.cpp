@@ -1,6 +1,6 @@
 #include <sys/time.h>
 #include <unistd.h>
-#include "stupidVM_SDL.hpp"
+#include "stupidVM_Supp.hpp"
 
 Timer::Timer (float Hz) {
 	Interval = (1000000.0 / Hz);

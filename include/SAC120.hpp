@@ -5,10 +5,17 @@
 	#include <SDL_audio.h>
 	
 	#include "stupidVM.hpp"
-	#include "peripheral.hpp"
+	#include "Peripheral.hpp"
 	
 	class SAC120 {
 		public:
+			static const Peripheral::PeripheralInfo PeripheralInfo;
+			
+			SAC120 (SDL_AudioSpec *Spec);
+			SAC120 (void) { SAC120 (NULL); }
+			~SAC120 (void);
+			
+			//"private":
 			struct Sample {
 				U16 Len = 256;
 				U8 Dat [256];
@@ -23,11 +30,9 @@
 			};
 			struct Channel Chs [4];
 			
-			SAC120 (SDL_AudioSpec *Spec);
-			SAC120 (void) { SAC120 (NULL); }
-			~SAC120 (void);
+			Word Regs [16];
+			Sample Waveforms [256];
 			
 			SDL_AudioSpec AudSpec;
-			void PeripheralFunc (PeripheralBus *Bus);
 	};
 #endif

@@ -1,6 +1,6 @@
 MAKE_O=cc ${COPTS} ${CPP} -r -no-pie -o $@
 
-COPTS=-funroll-loops -funroll-all-loops -Ofast -march=native -mtune=native -std=c++20 -Wall -Wextra -Wpedantic -I./include
+COPTS=-funroll-loops -funroll-all-loops -Ofast -march=native -mtune=native -Wall -Wextra -Wpedantic -I./include
 CPP=-x c++
 
 SDL2=$(shell sdl2-config --cflags)
