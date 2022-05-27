@@ -1,18 +1,28 @@
-#include "Peripheral.hpp"
+#include "stupidVM.h"
+#include "Peripherals.hpp"
 
-template <class device> Peripheral::PeripheralID Peripheral::New (void) {
-	PeripheralID id = Add <device> ();
+#define CALL2(id, what, ...) { \
+		if (perip [id].info -> what != NULL) \
+			perip [id].info -> what (perip [id].obj, __VA_ARGS__); \
+	}
+#define CALL(id, what) { \
+		if (perip [id].info -> what != NULL) \
+			perip [id].info -> what (perip [id].obj); \
+	}
+
+Peripherals::PeripheralID Peripherals::New (const PeripheralInfo *Info) {
+	PeripheralID id = Add (Info);
 	PowerOn (id);
 	return id;
 }
 
-void Peripheral::Delete (Peripheral::PeripheralID ID) {
+void Peripherals::Delete (Peripherals::PeripheralID ID) {
 	PowerOff (ID);
 	Remove (ID);
 }
 
 
-template <class device> Peripheral::PeripheralID Peripheral::Add (void) {
+Peripherals::PeripheralID Peripherals::Add (const PeripheralInfo *Info) {
 	PeripheralID id;
 	
 	// find next available peripheral slot
@@ -25,27 +35,50 @@ template <class device> Peripheral::PeripheralID Peripheral::Add (void) {
 		return -1; // signify error
 			
 	
-	perip [id].obj = new device;
-	perip [id].info = &((device *) perip [id].obj) -> PeripheralInfo;
+	perip [id].obj = malloc (Info -> Size);
+	perip [id].info = Info;
 	return id;
 }
 
-void Peripheral::Remove (Peripheral::PeripheralID ID) {
+void Peripherals::Remove (Peripherals::PeripheralID ID) {
 	if (perip [ID].obj != NULL)
-		delete perip [ID].obj;
+		free (perip [ID].obj);
 }
 
 
-void Peripheral::PowerOn (Peripheral::PeripheralID ID) {
-	perip [ID].info -> Constructor (perip [ID].obj);
+void Peripherals::PowerOn (Peripherals::PeripheralID ID) {
+	CALL (ID, Constructor);
 }
 
-void Peripheral::PowerOff (Peripheral::PeripheralID ID) {
-	perip [ID].info -> Destructor (perip [ID].obj);
+void Peripherals::PowerOff (Peripherals::PeripheralID ID) {
+	CALL (ID, Destructor);
+}
+
+void Peripherals::BusAction (struct Pair *bus) {
+	U8 ID = (bus -> addr & 0xF0) >> 4;
+	
+	PeripheralBus bus2;
+	
+	bus2.RW = bus -> RW;
+	bus2.addr = bus -> addr & 0x0F;
+	bus2.word = bus -> word;
+	
+	CALL2 (ID, IO, &bus2);
+	
+	bus -> word = bus2.word;
 }
 
 
-Peripheral::~Peripheral (void) {
+Peripherals::~Peripherals (void) {
 	for (PeripheralID id = 0; id != 16; id ++)
 		Delete (id);
+}
+
+Peripherals::Peripherals (void) {
+	static const PeripheralInfo definfo = { NULL };
+	
+	for (PeripheralID id = 0; id != 16; id ++) {
+		perip [id].info = &definfo;
+		perip [id].obj = NULL;
+	}
 }

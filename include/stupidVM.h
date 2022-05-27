@@ -3,6 +3,7 @@
 	
 	#include <stdint.h>
 	#include <stdlib.h>
+	#include <stdbool.h>
 	
 	#define RW_READ 1
 	#define RW_WRITE 0
@@ -16,6 +17,7 @@
 	typedef int_fast32_t S32;
 	typedef int_fast64_t S64;
 	
+	typedef bool Bit;
 	
 	typedef U16 Address;
 	typedef U8 Word;

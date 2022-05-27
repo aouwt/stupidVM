@@ -1,7 +1,7 @@
 #ifndef SMP100_HPP
 	#define SMP100_HPP
 
-	#include "stupidVM.hpp"
+	#include "stupidVM.h"
 	class SMP100 {
 		
 		public:

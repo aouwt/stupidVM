@@ -3,7 +3,7 @@
 	
 	#include <unistd.h>
 	
-	#include "stupidVM.hpp"
+	#include "stupidVM.h"
 	
 	class Timer {
 		public:

@@ -1,11 +1,12 @@
 #include "SMP100.hpp"
-#include "Peripheral.hpp"
+#include "Peripherals.hpp"
 #include "stupidVM_Supp.hpp"
+#include "SAC120.h"
 #include <stdio.h>
 
 
 static SMP100 *CPU;
-static Peipheral *Peripherals;
+static Peripherals *Perip;
 
 namespace Memories {
 	Word ASpace [0xFFFF];
@@ -35,7 +36,7 @@ void cycle (void) {
 			READ (Memories::ASpace);
 	} else
 	if (addr >= 0xFF00) {	// Peripheral
-		Peripherals -> BusAction (addr & 0x00FF
+		Perip -> BusAction (&CPU -> Bus);
 	} else {	// SRAM
 		if (CPU -> Bus.RW == RW_READ)
 			READ (Memories::ASpace);
@@ -49,6 +50,8 @@ void cycle (void) {
 
 int main (void) {
 	CPU = new SMP100 (0xA000, 0x1F00);
+	Perip = new Peripherals;
+	Perip -> New (&SAC120);
 	
 	CPU -> SignalReset ();
 	Timer timer (8000); // in KHz
