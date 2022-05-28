@@ -1,9 +1,11 @@
 #include <SDL.h>
 #include <SDL_audio.h>
+#include <math.h>
 
 #include "stupidVM.h"
 #include "Peripheral.h"
 #include "SAC120.h"
+#include "SAC120_Internal.h"
 
 static const SDL_AudioSpec DefaultAS = {
 	.freq = 44100,
@@ -11,6 +13,30 @@ static const SDL_AudioSpec DefaultAS = {
 	.samples = 512
 };
 
+
+void genwaves (SAC120_Sample waves [64] [256]) {
+	U8 bases [64] [4];
+	
+	for (int samp = 0; samp != 64; samp ++) {
+		bases [samp] [0] = (samp >= 32) ? 255 : 0; // square wave
+		bases [samp] [1] = abs (samp - 32); // triangle / sawtooth
+		bases [samp] [2] = rand () & 0xF0; // 16 bit noise
+		bases [samp] [3] = (rand () & 1) ? 255 : 0; // 1 bit noise
+	}
+	
+	for (int id = 0; id != 256; id ++) {
+		U8 samp = 0;
+		const U8 duty = id & 0x3F;
+		const U8 base = (id & 0xC0) >> 6; // upper two bits are for waveform ID
+		
+		
+		for (samp = 0; samp < duty; samp ++)
+			waves [samp] [id] = bases [samp] [base];
+		
+		for (; samp < 64; samp ++)
+			waves [samp] [id] = bases [samp - duty] [base];
+	}
+}
 
 static void callback (void *this, uint8_t *stream, int len) {
 	struct SAC120 *_ = (struct SAC120 *) this;
@@ -21,12 +47,12 @@ static void callback (void *this, uint8_t *stream, int len) {
 		for (U8 ch = 0; ch != 3; ch ++) {
 			
 			if (-- _->Chs [ch].ToNext == 0) {
-				if (++ _->Chs [ch].CurSamp >= _->Chs [ch].Samp -> Len)
+				if (++ _->Chs [ch].CurSamp >= 64)
 					_->Chs [ch].CurSamp = 0;
 				_->Chs [ch].ToNext = _->Chs [ch].SampTime;
 			}
 			
-			stream [i] += (_->Chs [ch].Samp -> Dat [_->Chs [ch].CurSamp]) * _->Chs [ch].Amp;
+			stream [i] += _->Chs [ch].Samp [_->Chs [ch].CurSamp] * _->Chs [ch].Amp;
 		}
 		
 	}
@@ -46,7 +72,7 @@ static void pf_io (void *this, PeripheralBus *bus) {
 			_->Chs [ch].SampTime =
 				(_->AudSpec.freq / // convert to samples
 					(_->Regs [ch + 0] & (_->Regs [ch + 1] << 8)) // get frequency
-				) / _->Chs [ch].Samp -> Len // convert to samptime
+				) / 64 // convert to samptime
 			;
 		}
 	} else
@@ -55,6 +81,8 @@ static void pf_io (void *this, PeripheralBus *bus) {
 
 static void construct (void *this) {
 	struct SAC120 *_ = (struct SAC120 *) this;
+	
+	genwaves (_->Waveforms);
 	
 	SDL_Init (SDL_INIT_AUDIO);
 	SDL_AudioSpec request = DefaultAS;

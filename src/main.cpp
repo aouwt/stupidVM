@@ -2,6 +2,7 @@
 #include "Peripherals.hpp"
 #include "stupidVM_Supp.hpp"
 #include "SAC120.h"
+#include "SMP100c.hpp"
 #include <stdio.h>
 
 
@@ -52,6 +53,7 @@ int main (void) {
 	CPU = new SMP100 (0xA000, 0x1F00);
 	Perip = new Peripherals;
 	Perip -> New (&SAC120);
+	Perip -> New (&SMP100c);
 	
 	CPU -> SignalReset ();
 	Timer timer (8000); // in KHz
