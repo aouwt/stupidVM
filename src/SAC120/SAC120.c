@@ -107,3 +107,4 @@ const PeripheralInfo SAC120 = {
 	.Name = "SAC120"
 };
 
+const PeripheralInfo *P_ThisInfo = &SAC120;

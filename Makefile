@@ -1,27 +1,42 @@
-MAKE_O=cc ${COPTS} -r -no-pie -o $@
+CALLED_DIRECTORY	:=	$(shell pwd)
 
-COPTS=-std=c++20 -funroll-loops -funroll-all-loops -Ofast -march=native -mtune=native -Wall -Wextra -Wpedantic -I./include
+COPTS	=	${GLOBALOPTS} -std=c++20 -funroll-loops -funroll-all-loops -Ofast -march=native -mtune=native -Wall -Wextra -Wpedantic -I${CALLED_DIRECTORY}/include -fPIC
+LDOPTS	=	${GLOBALOPTS}
 
-SDL2=$(shell sdl2-config --cflags)
-SDL2_AUDIO=${SDL2}
-SDL2_THREAD=${SDL2}
-
-DEPS=-lstdc++ $(shell sdl2-config --libs)
-
-./stupidVM: ./obj/main.o ./obj/SMP100.o ./obj/SAC120.o ./obj/stupidVM.o
-	cc ${COPTS} $^ ${DEPS} -o ./stupidVM
+CC_O	=	cd $(@D) && cc ${COPTS} -c $(^F)
+LD_O	=	ld ${LDOPTS} -no-pie -r $^ -o $@
+LD_SO	=	ld ${LDOPTS} -shared -o $@ $^
 
 
-./obj:
-	mkdir obj -p
+SDL2_FLAGS	=	$(shell sdl2-config --cflags)
+SDL2_LIBS	=	$(shell sdl2-config --libs)
 
-./obj/main.o:	./obj; ${MAKE_O} ${SDL2} ./src/*.c*
+LIBS	=	-lm -lstdc++ -lgcc -lSDL2 -ldl
 
-./obj/SMP100.o:	./obj; ${MAKE_O} ${SDL2_THREAD} ./src/SMP100/*.c*
-./obj/SAC120.o:	./obj; ${MAKE_O} ${SDL2_AUDIO} ./src/SAC120/*.c*
-./obj/stupidVM.o:	./obj; ${MAKE_O} ${SDL2} ./src/stupidVM/*.c*
+
+
+all:	./stupidVM ./SAC120.so ./SMP100.so
+
+./stupidVM:	./obj/main.o ./obj/SMP100.o ./obj/stupidVM.o
+	cc ${COPTS} $^ -o $@ ${LIBS}
+
+
+./obj/main.o:	./src/main.o;	${LD_O}
+./obj/SMP100.o:	./src/SMP100/*.o;	${LD_O}
+./obj/SAC120.o:	./src/SAC120/*.o;	${LD_O}
+./obj/stupidVM.o:	./src/stupidVM/*.o;	${LD_O}
+
+./SAC120.so:	./obj/SAC120.o;	${LD_SO} ${SDL2_LIBS}
+./SMP100.so:	./obj/SMP100.o;	${LD_SO} ${SDL2_LIBS}
+
+./src/main.o:	./src/main.cpp;	${CC_O}
+
+./src/SMP100/%.o:	./src/SMP100/%.cpp;	${CC_O} ${SDL2_FLAGS}
+./src/SAC120/%.o:	./src/SAC120/%.c;	${CC_O} ${SDL2_FLAGS}
+./src/stupidVM/%.o:	./src/stupidVM/%.cpp;	${CC_O}
+
 
 clean:
-	rm -rf ./obj
+	rm -rf ./obj/* ./src/*.o ./src/*/*.o ./*.so
 
-.PHONY: clean
+.PHONY: clean all

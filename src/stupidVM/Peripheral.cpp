@@ -10,6 +10,7 @@
 			perip [id].info -> what (perip [id].obj); \
 	}
 
+
 Peripherals::PeripheralID Peripherals::New (const PeripheralInfo *Info) {
 	PeripheralID id = Add (Info);
 	PowerOn (id);
