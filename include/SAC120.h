@@ -4,5 +4,5 @@
 	#include "stupidVM.h"
 	#include "Peripheral.h"
 	
-	extern const PeripheralInfo SAC120;
+	//extern const PeripheralInfo SAC120;
 #endif

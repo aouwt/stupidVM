@@ -7,6 +7,7 @@
 #include "SAC120.h"
 #include "SAC120_Internal.h"
 
+
 static const SDL_AudioSpec DefaultAS = {
 	.freq = 44100,
 	.format = AUDIO_U8,
@@ -14,7 +15,7 @@ static const SDL_AudioSpec DefaultAS = {
 };
 
 
-void genwaves (SAC120_Sample waves [64] [256]) {
+static void genwaves (SAC120_Sample waves [64] [256]) {
 	U8 bases [64] [4];
 	
 	for (int samp = 0; samp != 64; samp ++) {
@@ -99,12 +100,13 @@ static void destruct (void *_unused) {
 }
 
 
-const PeripheralInfo SAC120 = {
-	.Constructor = &construct,
-	.Destructor = &destruct,
-	.IO = &pf_io,
+static const PeripheralInfo SAC120 = {
+	.Constructor = construct,
+	.Destructor = destruct,
+	.IO = pf_io,
 	.Int = NULL,
-	.Name = "SAC120"
+	.Name = "SAC120",
+	.Size = sizeof (struct SAC120)
 };
 
 const PeripheralInfo *P_ThisInfo = &SAC120;

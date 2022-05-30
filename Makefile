@@ -1,6 +1,7 @@
 CALLED_DIRECTORY	:=	$(shell pwd)
 
-COPTS	=	${GLOBALOPTS} -std=c++20 -funroll-loops -funroll-all-loops -Ofast -march=native -mtune=native -Wall -Wextra -Wpedantic -I${CALLED_DIRECTORY}/include -fPIC
+COPTS	=	${GLOBALOPTS} $(if ${OPTIMIZE},-Ofast -march=native -mtune=native -Wall -Wextra -Wpedantic -funroll-loops -funroll-all-loops) -I${CALLED_DIRECTORY}/include -fPIC
+CXXOPTS	=	${COPTS} -std=c++20
 LDOPTS	=	${GLOBALOPTS}
 
 CC_O	=	cd $(@D) && cc ${COPTS} -c $(^F)
@@ -10,12 +11,13 @@ LD_SO	=	ld ${LDOPTS} -shared -o $@ $^
 
 SDL2_FLAGS	=	$(shell sdl2-config --cflags)
 SDL2_LIBS	=	$(shell sdl2-config --libs)
+CXX_LIBS	=	-lstdc++
 
 LIBS	=	-lm -lstdc++ -lgcc -lSDL2 -ldl
 
 
 
-all:	./stupidVM ./SAC120.so ./SMP100.so
+all:	./stupidVM ./SAC120.so ./SMP100c.so
 
 ./stupidVM:	./obj/main.o ./obj/SMP100.o ./obj/stupidVM.o
 	cc ${COPTS} $^ -o $@ ${LIBS}
@@ -27,13 +29,13 @@ all:	./stupidVM ./SAC120.so ./SMP100.so
 ./obj/stupidVM.o:	./src/stupidVM/*.o;	${LD_O}
 
 ./SAC120.so:	./obj/SAC120.o;	${LD_SO} ${SDL2_LIBS}
-./SMP100.so:	./obj/SMP100.o;	${LD_SO} ${SDL2_LIBS}
+./SMP100c.so:	./obj/SMP100.o;	${LD_SO} ${SDL2_LIBS} ${CXX_LIBS}
 
-./src/main.o:	./src/main.cpp;	${CC_O}
+./src/main.o:	./src/main.cpp;	${CC_O} ${CXXOPTS}
 
-./src/SMP100/%.o:	./src/SMP100/%.cpp;	${CC_O} ${SDL2_FLAGS}
+./src/SMP100/%.o:	./src/SMP100/%.cpp;	${CC_O} ${CXXOPTS} ${SDL2_FLAGS}
 ./src/SAC120/%.o:	./src/SAC120/%.c;	${CC_O} ${SDL2_FLAGS}
-./src/stupidVM/%.o:	./src/stupidVM/%.cpp;	${CC_O}
+./src/stupidVM/%.o:	./src/stupidVM/%.cpp;	${CC_O} ${CXXOPTS}
 
 
 clean:

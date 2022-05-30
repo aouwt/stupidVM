@@ -99,7 +99,7 @@ int parse_args (char *argv [], int argc) {
 						if (sym == NULL)
 							fprintf (stderr, "%s\n", dlerror ());
 						else
-							Perip -> New ((const PeripheralInfo *) sym);
+							Perip -> New (*((const PeripheralInfo **) sym));
 					} break;
 					
 					default: {
