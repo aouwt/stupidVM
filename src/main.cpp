@@ -55,6 +55,8 @@ void cycle (void) {
 
 
 int parse_args (char *argv [], int argc) {
+	Bit loaded_cartridge = false;
+	
 	for (int i = 0; i != argc; i ++) {
 		if (argv [i] [0] == '-') { // is arg?
 		
@@ -109,6 +111,8 @@ int parse_args (char *argv [], int argc) {
 				}
 			}
 				
+		} else {
+			
 		}
 	}	
 	return 0;

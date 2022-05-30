@@ -14,8 +14,9 @@ static const SDL_AudioSpec DefaultAS = {
 	.samples = 512
 };
 
+static SAC120_Sample Waveforms [64] [256];
 
-static void genwaves (SAC120_Sample waves [64] [256]) {
+static void __attribute__((constructor)) genwaves (void) {
 	U8 bases [64] [4];
 	
 	for (int samp = 0; samp != 64; samp ++) {
@@ -32,10 +33,10 @@ static void genwaves (SAC120_Sample waves [64] [256]) {
 		
 		
 		for (samp = 0; samp < duty; samp ++)
-			waves [samp] [id] = bases [samp] [base];
+			Waveforms [samp] [id] = bases [samp] [base];
 		
 		for (; samp < 64; samp ++)
-			waves [samp] [id] = bases [samp - duty] [base];
+			Waveforms [samp] [id] = bases [samp - duty] [base];
 	}
 }
 
@@ -68,7 +69,7 @@ static void pf_io (void *this, PeripheralBus *bus) {
 		if ((bus -> addr & 0x03) == 3) { // write to volume byte to push change
 			U8 ch = (bus->addr & 0xC) >> 2; // get top 2 bits
 			
-			_->Chs [ch].Samp = &_->Waveforms [_->Regs [ch + 2]];
+			_->Chs [ch].Samp = Waveforms [_->Regs [ch + 2]];
 			_->Chs [ch].Amp = _->Regs [ch + 3] / 256.0;
 			_->Chs [ch].SampTime =
 				(_->AudSpec.freq / // convert to samples
@@ -82,8 +83,6 @@ static void pf_io (void *this, PeripheralBus *bus) {
 
 static void construct (void *this) {
 	struct SAC120 *_ = (struct SAC120 *) this;
-	
-	genwaves (_->Waveforms);
 	
 	SDL_Init (SDL_INIT_AUDIO);
 	SDL_AudioSpec request = DefaultAS;
