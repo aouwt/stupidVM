@@ -11,9 +11,9 @@ LD_SO	=	ld ${LDOPTS} -shared -o $@ $^
 
 SDL2_FLAGS	=	$(shell sdl2-config --cflags)
 SDL2_LIBS	=	$(shell sdl2-config --libs)
-CXX_LIBS	=	-lstdc++
+CXX_LIBS	=	-lc++
 
-LIBS	=	-lm -lstdc++ -lgcc -lSDL2 -ldl
+LIBS	=	-lm ${SDL2_LIBS} ${CXX_LIBS} -ldl
 
 
 
