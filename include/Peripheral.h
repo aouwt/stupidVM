@@ -15,7 +15,7 @@
 		void (* Destructor) (void *);
 		void (* IO) (void *, PeripheralBus *);
 		void (* Int) (void *);
-		char Name [16];
+		char Name [4];
 		size_t Size;
 	} PeripheralInfo;
 #endif

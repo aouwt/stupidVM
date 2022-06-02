@@ -21,11 +21,9 @@
 			~Peripherals (void);
 			Peripherals (void);
 			
-		private:
 			struct {
 				const PeripheralInfo *info;
 				void *obj = NULL;
-			} perip [16];
-			
+			} Perip [16];
 	};
 #endif

@@ -22,11 +22,12 @@ all:	./stupidVM ./SAC120.so ./SMP100c.so
 debug:	GLOBALOPTS += -g
 debug:	all ./logger.so
 
-./stupidVM:	./obj/main.o ./obj/SMP100.o ./obj/stupidVM.o
+./stupidVM:	./obj/main.o ./obj/SMP100.o ./obj/stupidVM.o ./obj/periphcontrol.o
 	cc ${COPTS} $^ -o $@ ${LIBS}
 
 
 ./obj/main.o:	./src/main.o;	${LD_O}
+./obj/periphcontrol.o:	./src/periphcontrol.o;	${LD_O}
 ./obj/SMP100.o:	./src/SMP100/*.o;	${LD_O}
 ./obj/SAC120.o:	./src/SAC120/*.o;	${LD_O}
 ./obj/stupidVM.o:	./src/stupidVM/*.o;	${LD_O}
@@ -36,6 +37,7 @@ debug:	all ./logger.so
 ./logger.so:	./src/debug/log.o;	${LD_SO};
 
 ./src/main.o:	./src/main.cpp;	${CC_O} ${CXXOPTS}
+./src/periphcontrol.o:	./src/periphcontrol.cpp;	${CC_O} ${CXXOPTS}
 
 ./src/SMP100/%.o:	./src/SMP100/%.cpp;	${CC_O} ${CXXOPTS} ${SDL2_FLAGS}
 ./src/SAC120/%.o:	./src/SAC120/%.c;	${CC_O} ${SDL2_FLAGS}

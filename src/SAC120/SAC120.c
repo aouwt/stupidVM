@@ -104,7 +104,7 @@ static const PeripheralInfo SAC120 = {
 	.Destructor = destruct,
 	.IO = pf_io,
 	.Int = NULL,
-	.Name = "SAC120",
+	.Name = {'A', 'C', '1', '2'},
 	.Size = sizeof (struct SAC120)
 };
 

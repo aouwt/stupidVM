@@ -105,7 +105,7 @@ const PeripheralInfo SMP100c = {
 	.Destructor = &destruct,
 	.IO = &pf_io,
 	.Int = NULL,
-	.Name = "SMP100c",
+	.Name = {'M', 'P', '1', '0'},
 	.Size = sizeof (struct SMP100c)
 };
 

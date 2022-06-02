@@ -2,12 +2,12 @@
 #include "Peripherals.hpp"
 
 #define CALL2(id, what, ...) { \
-		if (perip [id].info -> what != NULL) \
-			perip [id].info -> what (perip [id].obj, __VA_ARGS__); \
+		if (Perip [id].info -> what != NULL) \
+			Perip [id].info -> what (Perip [id].obj, __VA_ARGS__); \
 	}
 #define CALL(id, what) { \
-		if (perip [id].info -> what != NULL) \
-			perip [id].info -> what (perip [id].obj); \
+		if (Perip [id].info -> what != NULL) \
+			Perip [id].info -> what (Perip [id].obj); \
 	}
 
 
@@ -28,7 +28,7 @@ Peripherals::PeripheralID Peripherals::Add (const PeripheralInfo *Info) {
 	
 	// find next available peripheral slot
 	for (id = 0; id != 16; id ++) {
-		if (perip [id].obj == NULL)
+		if (Perip [id].obj == NULL)
 			break;
 	}
 	
@@ -36,14 +36,14 @@ Peripherals::PeripheralID Peripherals::Add (const PeripheralInfo *Info) {
 		return -1; // signify error
 			
 	
-	perip [id].obj = malloc (Info -> Size);
-	perip [id].info = Info;
+	Perip [id].obj = malloc (Info -> Size);
+	Perip [id].info = Info;
 	return id;
 }
 
 void Peripherals::Remove (Peripherals::PeripheralID ID) {
-	if (perip [ID].obj != NULL)
-		free (perip [ID].obj);
+	if (Perip [ID].obj != NULL)
+		free (Perip [ID].obj);
 }
 
 
@@ -79,7 +79,7 @@ Peripherals::Peripherals (void) {
 	static const PeripheralInfo definfo = { NULL };
 	
 	for (PeripheralID id = 0; id != 16; id ++) {
-		perip [id].info = &definfo;
-		perip [id].obj = NULL;
+		Perip [id].info = &definfo;
+		Perip [id].obj = NULL;
 	}
 }

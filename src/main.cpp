@@ -4,21 +4,20 @@
 
 #include "SMP100.hpp"
 #include "Peripherals.hpp"
+#include "periphcontrol.hpp"
 #include "stupidVM_Supp.hpp"
+#include "main.hpp"
 
-
-static SMP100 *CPU;
-static Peripherals *Perip;
+SMP100 *CPU;
+Peripherals *Perip;
 static struct {
 	void **Handles;
 	int Count = 0;
 } Dl;
 
-namespace Memories {
-	Word ASpace [0xFFFF];
-	Word Banks [0xFF] [0x8000];
-	U8 CurBank;
-};
+Word Memories::ASpace [0xFFFF];
+Word *Memories::Banks [0xFF] = {NULL};
+U8 Memories::CurBank;
 
 
 void cycle (void) {
@@ -29,11 +28,13 @@ void cycle (void) {
 	CPU -> Cycle ();
 	
 	if ((addr >= 0x2000) && (addr < 0xA000)) {
-		if (CPU -> Bus.RW == RW_READ)
-			READ (Memories::Banks [Memories::CurBank]);
-		else {
-			if (Memories::CurBank < 127)
-				WRITE (Memories::Banks [Memories::CurBank]);
+		if (Memories::Banks [Memories::CurBank] != NULL) {
+			if (CPU -> Bus.RW == RW_READ)
+				READ (Memories::Banks [Memories::CurBank]);
+			else {
+				if (Memories::CurBank < 127)
+					WRITE (Memories::Banks [Memories::CurBank]);
+			}
 		}
 		
 	} else
@@ -54,10 +55,20 @@ void cycle (void) {
 }
 
 
+void print_help (char *argv0) {
+	#define _(...)	fprintf (stdout, __VA_ARGS__)
+	
+	_ ("Usage: %s [-v] [-h] [-p SO] [-c SVMRC] [-m BANK] [-f FREQ | -F] [[-r] ROM]\n", argv0);
+	_ ("Refer to stupidVM(1) for more information.\n");
+	
+	#undef _
+}
+
+
 int parse_args (char *argv [], int argc) {
 	Bit loaded_cartridge = false;
 	
-	for (int i = 0; i != argc; i ++) {
+	for (int i = 1; i != argc; i ++) {
 		if (argv [i] [0] == '-') { // is arg?
 		
 			const char *me;
@@ -69,7 +80,7 @@ int parse_args (char *argv [], int argc) {
 					const char *s;
 				} lookup [] = {
 					{ "help", "h" },
-					{ "load-so", "l" },
+					{ "peripheral", "p" },
 					{ NULL, "" }
 				};
 				
@@ -104,8 +115,21 @@ int parse_args (char *argv [], int argc) {
 							Perip -> New (*((const PeripheralInfo **) sym));
 					} break;
 					
+					case 'h': {
+						print_help (argv [0]);
+						return 1;
+					} break;
+					
+					case 'm': {
+						int b = atoi (argv [++ i]);
+						for (int n = 0; n != b; n ++) {
+							if (Memories::Banks [n] != NULL)
+								Memories::Banks [n] = new Word [32768];
+						}
+					} break;
+					
 					default: {
-						fprintf (stderr, "Unknown argument '%c'\n", me [c]);
+						fprintf (stderr, "Unknown argument '%c'. Run '%s --help' for more information.\n", me [c], argv [0]);
 					} break;
 				
 				}
@@ -121,6 +145,7 @@ int parse_args (char *argv [], int argc) {
 int main (int argc, char *argv []) {
 	CPU = new SMP100 (0xA000, 0x1F00);
 	Perip = new Peripherals;
+	Perip -> New (&P_ThisInfo);
 	Dl.Handles = new void * [argc];
 	
 	{	int ret = parse_args (argv, argc);
