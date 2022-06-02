@@ -109,3 +109,4 @@ const PeripheralInfo SMP100c = {
 	.Size = sizeof (struct SMP100c)
 };
 
+const PeripheralInfo *P_ThisInfo = &SMP100c;
