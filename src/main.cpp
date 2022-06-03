@@ -5,6 +5,7 @@
 #include "SMP100.hpp"
 #include "Peripherals.hpp"
 #include "periphcontrol.hpp"
+#include "romloader.hpp"
 #include "stupidVM_Supp.hpp"
 #include "main.hpp"
 
@@ -15,8 +16,8 @@ static struct {
 	int Count = 0;
 } Dl;
 
-Word Memories::ASpace [0xFFFF];
-Word *Memories::Banks [0xFF] = {NULL};
+uint8_t Memories::ASpace [0xFFFF];
+uint8_t *Memories::Banks [0xFF] = {NULL};
 U8 Memories::CurBank;
 
 
@@ -66,8 +67,6 @@ void print_help (char *argv0) {
 
 
 int parse_args (char *argv [], int argc) {
-	Bit loaded_cartridge = false;
-	
 	for (int i = 1; i != argc; i ++) {
 		if (argv [i] [0] == '-') { // is arg?
 		
@@ -124,7 +123,7 @@ int parse_args (char *argv [], int argc) {
 						int b = atoi (argv [++ i]);
 						for (int n = 0; n != b; n ++) {
 							if (Memories::Banks [n] != NULL)
-								Memories::Banks [n] = new Word [32768];
+								Memories::Banks [n] = new uint8_t [32768];
 						}
 					} break;
 					
@@ -136,7 +135,7 @@ int parse_args (char *argv [], int argc) {
 			}
 				
 		} else {
-			
+			loadrom (argv [i]);
 		}
 	}	
 	return 0;

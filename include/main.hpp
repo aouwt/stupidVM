@@ -9,8 +9,8 @@
 	extern Peripherals *Perip;
 
 	namespace Memories {
-		extern Word ASpace [0xFFFF];
-		extern Word *Banks [0xFF];
+		extern uint8_t ASpace [0xFFFF];
+		extern uint8_t *Banks [0xFF];
 		extern U8 CurBank;
 	};
 #endif

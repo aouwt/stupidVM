@@ -13,7 +13,7 @@ void io (void *_this, PeripheralBus *bus) {
 	switch (bus -> addr) {
 		case 0x0:
 			if (bus -> RW == RW_READ)
-				bus -> word = _->curperiph;//Perip -> Perip [bus -> word & 0xF].info -> Name;
+				bus -> word = _->curperiph;
 			else
 				_->curperiph = bus -> word & 0xF;
 		break;
