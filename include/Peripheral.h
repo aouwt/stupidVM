@@ -9,13 +9,16 @@
 		Word word;
 	} PeripheralBus;
 
-
+	
+	typedef void (* PeripheralFunc_NoArg) (void *);
+	typedef void (* PeripheralFunc_IO) (void *, PeripheralBus *);
+	
 	typedef struct _PeripheralInfo {
-		void (* Constructor) (void *);
-		void (* Destructor) (void *);
-		void (* IO) (void *, PeripheralBus *);
-		void (* Int) (void *);
-		char Name [4];
+		PeripheralFunc_NoArg Constructor, Destructor;
+		PeripheralFunc_NoArg Int;
+		PeripheralFunc_IO IO;
+		char Name [5];
 		size_t Size;
+		U8 Slots;
 	} PeripheralInfo;
 #endif

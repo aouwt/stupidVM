@@ -106,12 +106,17 @@ int parse_args (char *argv [], int argc) {
 							fprintf (stderr, "%s\n", dlerror ());
 							break;
 						}
-						void *sym = dlsym (hdl, "P_ThisInfo");
+						void **sym = dlsym (hdl, "P_ThisInfo");
 						
 						if (sym == NULL)
 							fprintf (stderr, "%s\n", dlerror ());
-						else
-							Perip -> New (*((const PeripheralInfo **) sym));
+						else {
+							for (int i = 0; sym [i] != NULL; i ++) {
+								const PeripheralInfo *me = ((const PeripheralInfo **) sym) [i]
+								fprintf (stderr, "Initializing peripheral %s\n", me -> Name);
+								Perip -> New (me);
+							}
+						}
 					} break;
 					
 					case 'h': {

@@ -34,16 +34,18 @@ Peripherals::PeripheralID Peripherals::Add (const PeripheralInfo *Info) {
 	
 	if (id == 16)
 		return -1; // signify error
-			
 	
 	Perip [id].obj = malloc (Info -> Size);
 	Perip [id].info = Info;
+	
 	return id;
 }
 
 void Peripherals::Remove (Peripherals::PeripheralID ID) {
-	if (Perip [ID].obj != NULL)
+	if (Perip [ID].obj != NULL) {
 		free (Perip [ID].obj);
+		Perip [ID].obj = NULL:
+	}	
 }
 
 
